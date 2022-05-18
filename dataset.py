@@ -17,7 +17,7 @@ def concat_turns(row, special_tokens="start"):
     :return:
     """
     if special_tokens == "None":
-        return row["turn1"] + row["turn2"] + row["turn3"]
+        return row["turn1"] + " " + row["turn2"] + " " + row["turn3"]
 
     elif special_tokens == "start":
         return "<A>" + row["turn1"] + "<B>" + row["turn2"] + "<A>" + row["turn3"]
@@ -36,10 +36,10 @@ def preprocess(df, special_tokens="start"):
 
 def load_datasets(special_tokens="start"):
     train = pd.read_csv('data/train.txt', sep='\t').drop('id', axis=1)
-    train = preprocess(train)
+    train = preprocess(train, special_tokens)
 
     dev = pd.read_csv('data/dev.txt', sep='\t').drop('id', axis=1)
-    dev = preprocess(dev)
+    dev = preprocess(dev, special_tokens)
 
     # todo add test
     return train, dev
