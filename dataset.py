@@ -17,7 +17,7 @@ def concat_turns(row, special_tokens="start"):
     :return:
     """
     if special_tokens == "None":
-        return row["turn1"] + row["turn2"] + row["turn3"]
+        return row["turn1"] + " " + row["turn2"] + " " + row["turn3"]
 
     elif special_tokens == "start":
         return "<A>" + row["turn1"] + "<B>" + row["turn2"] + "<A>" + row["turn3"]
