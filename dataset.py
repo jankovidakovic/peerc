@@ -36,10 +36,10 @@ def preprocess(df, special_tokens="start"):
 
 def load_datasets(special_tokens="start"):
     train = pd.read_csv('data/train.txt', sep='\t').drop('id', axis=1)
-    train = preprocess(train)
+    train = preprocess(train, special_tokens)
 
     dev = pd.read_csv('data/dev.txt', sep='\t').drop('id', axis=1)
-    dev = preprocess(dev)
+    dev = preprocess(dev, special_tokens)
 
     # todo add test
     return train, dev
