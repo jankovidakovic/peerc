@@ -5,6 +5,7 @@ channels:
   - nvidia
   - conda-forge
   - anaconda
+  - huggingface
 dependencies:
   - python=3.9
   - numpy=1.22.3
@@ -13,6 +14,8 @@ dependencies:
   - pytorch::pytorch=1.11.0
   - scikit-learn=1.1.0
   - pandas=1.4.2
+  - transformers=4.19.2
+  - pytorch::torchtext=0.12.0
 # uncomment the stuff below when first pip package is needed
 #  - pip=21.2.4
 #  - pip:
