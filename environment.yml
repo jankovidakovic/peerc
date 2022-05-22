@@ -12,6 +12,7 @@ dependencies:
   - nvidia::cudatoolkit=11.3
   - pytorch::pytorch=1.11.0
   - scikit-learn=1.1.0
+  - pandas=1.4.2
 # uncomment the stuff below when first pip package is needed
 #  - pip=21.2.4
 #  - pip:
