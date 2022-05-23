@@ -140,3 +140,18 @@ def multiple_runs_with_different_seeds(config, n_runs: int = 5, seeds: list[str]
         metric_stats.update(test_metrics)
 
     print(json.dumps(metric_stats.get_stats(), indent=2))
+
+
+if __name__ == '__main__':
+    config = {
+        **baseline,
+        "verbose": True,
+        "seed": 7052020,
+        "save_metrics": True,
+        "model": "rnn",
+        "pack_padded": True,
+        "time_first": True,
+    }
+    config["hyperparams"]["max_grad_norm"] = 0.25
+    # multiple_runs_with_different_seeds(config, n_runs=5)
+    run(config)
