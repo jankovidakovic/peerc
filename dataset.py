@@ -1,3 +1,6 @@
+from functools import partial
+from typing import Callable
+
 import pandas as pd
 
 label2emotion = {0: "others", 1: "happy", 2: "sad", 3: "angry"}
@@ -20,7 +23,8 @@ def concat_turns(row, special_tokens="start"):
         return row["turn1"] + " " + row["turn2"] + " " + row["turn3"]
 
     elif special_tokens == "start":
-        return "<A>" + row["turn1"] + "<B>" + row["turn2"] + "<A>" + row["turn3"]
+        return "<A>: " + row["turn1"] + " <B>: " + row["turn2"] + " <A>: " + row["turn3"]
+    # kinda important : <A> and <B> must not be treated as unk, but as special tokens
 
     elif special_tokens == "both":
         return "<A>" + row["turn1"] + "</A>" + "<B>" + row["turn2"] + "</B>" + "<A>" + row["turn3"] + "</A>"
@@ -34,12 +38,30 @@ def preprocess(df, special_tokens="start"):
     return df
 
 
-def load_datasets(special_tokens="start"):
-    train = pd.read_csv('data/train.txt', sep='\t').drop('id', axis=1)
-    train = preprocess(train, special_tokens)
+def load_dataset_from_file(file_path, preprocess_fn: Callable[[pd.DataFrame], pd.DataFrame] = None):
+    """Loads the dataset from the given path and applies the preprocessing function if provided.
 
-    dev = pd.read_csv('data/dev.txt', sep='\t').drop('id', axis=1)
-    dev = preprocess(dev, special_tokens)
+    :param file_path:  path to the dataset file
+    :param preprocess_fn:  function to apply to the dataset
+    :return: the dataset, optionally preprocessed
+    """
 
-    # todo add test
-    return train, dev
+    # Load the dataset
+    df = pd.read_csv(file_path, sep='\t').drop('id', axis=1)
+
+    # Preprocess the dataset
+    df = preprocess_fn(df) if preprocess_fn else df
+    return df
+
+
+def load_datasets(special_tokens: str = "start"):
+    preprocessing_fn = partial(preprocess, special_tokens=special_tokens)
+    train_dataset = load_dataset_from_file("data/train.txt", preprocessing_fn)
+    dev_dataset = load_dataset_from_file("data/dev.txt", preprocessing_fn)
+    test_dataset = load_dataset_from_file("data/test.txt", preprocessing_fn)
+    return train_dataset, dev_dataset, test_dataset
+
+
+if __name__ == '__main__':
+    train_data, dev_data, test_data = load_datasets()
+    # print(train_data.loc[:, ["text"]].head())
