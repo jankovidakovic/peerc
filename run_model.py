@@ -148,10 +148,7 @@ if __name__ == '__main__':
         "verbose": True,
         "seed": 7052020,
         "save_metrics": True,
-        "model": "rnn",
-        "pack_padded": True,
-        "time_first": True,
     }
-    config["hyperparams"]["max_grad_norm"] = 0.25
+    config["hyperparams"]["max_grad_norm"] = 0.5
     # multiple_runs_with_different_seeds(config, n_runs=5)
     run(config)

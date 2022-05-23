@@ -187,3 +187,20 @@ def get_all_datasets(_config: dict[str, str]):
                                       label_vocab=train_dataset.label_vocab)
 
     return _train_dataset, _dev_dataset, _test_dataset
+
+
+if __name__ == '__main__':
+    config = {
+        "data_dir": "data",
+        "train_file": "train.txt",
+        "dev_file": "dev.txt",
+        "test_file": "test.txt"
+    }
+
+    train_dataset, dev_dataset, test_dataset = get_all_datasets(config)
+
+    print(f"Train dataset: {len(train_dataset)}")
+    print(f"Dev dataset: {len(dev_dataset)}")
+    print(f"Test dataset: {len(test_dataset)}")
+
+    # TODO - check how many unknown tokens appear in the dev and test sets
