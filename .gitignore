@@ -1,6 +1,8 @@
 # add additional stuff here, stuff below is auto-generated 
 #
 #
+data/glove.zip
+prototyping.ipynb
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all
