@@ -44,8 +44,11 @@ def train(model, data, optimizer, criterion, device: str = "cuda", **kwargs):
             torch.nn.utils.clip_grad_norm_(model.parameters(), kwargs["max_grad_norm"])
         optimizer.step()
         losses.append(loss.item())
-        data_it.set_postfix(loss=loss.item())
-    return sum(losses) / len(losses), confusion_matrix
+        data_it.set_postfix(loss=loss.item(), losses_length=len(losses))
+    try:
+        return sum(losses) / len(losses), confusion_matrix
+    except ZeroDivisionError:
+        return 0, confusion_matrix
 
 
 def evaluate(model, data, criterion, device: str = "cuda"):

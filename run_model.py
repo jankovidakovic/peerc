@@ -48,20 +48,21 @@ def run(config):
     optimizer = torch.optim.Adam(model.parameters(), lr=hyperparams["lr"])
     # TODO - make optimizers configurable
 
-    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(
-        train_dataset,
-        valid_dataset,
-        test_dataset,
-        hyperparams["batch_size"],
-        hyperparams["eval_batch_size"]
-    )
-
     num_epochs = hyperparams["epochs"]
     train_kwargs = {
         "max_grad_norm": hyperparams["max_grad_norm"],
     }
     metric_logger = MetricLogger(config["seed"], hyperparams, config["verbose"])
     for epoch in range(1, num_epochs + 1):
+        # reload dataloaders
+        train_dataloader, val_dataloader, test_dataloader = get_dataloaders(
+            train_dataset,
+            valid_dataset,
+            test_dataset,
+            hyperparams["batch_size"],
+            hyperparams["eval_batch_size"]
+        )
+
         train_loss, train_confusion_matrix = train(
             model=model, data=train_dataloader,
             optimizer=optimizer,
