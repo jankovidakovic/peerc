@@ -28,5 +28,5 @@ baseline = {
     "seed": 7052020,
     "verbose": True,
     "save_metrics": True,
-    "save_model": True
+    "save_model": False
 }
