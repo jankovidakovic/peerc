@@ -1,14 +1,16 @@
 import os
 from abc import abstractmethod
+from typing import Optional
 
 import torch
+import tqdm
 
-from vocab import VocabFactory
+from vocab import Vocab
 
 
 class EmbeddingLoader:
     def __init__(self):
-        self.vocab = None
+        self.vocab: Optional[Vocab] = None
 
     @abstractmethod
     def load_embeddings(self, device: str):
@@ -23,6 +25,10 @@ class EmbeddingLoader:
         return RandomEmbeddingLoader(embedding_dim)
 
     @staticmethod
+    def get_pt_embedding_loader(path: str):
+        return PtEmbeddingLoader(path)
+
+    @staticmethod
     def from_config(config):
         _embeddings = config["hyperparams"]["embeddings"]
         if _embeddings == "glove":
@@ -31,11 +37,29 @@ class EmbeddingLoader:
                     config["data"]["data_dir"],
                     config["data"]["embedding_file"]
                 ))
-        # elif embeddings == "random":  -- uncomment when more embeddings are added
-        else:
+        elif _embeddings == "random":
             return EmbeddingLoader.get_random_embedding_loader(
                 config["hyperparams"]["embedding_dim"]
             )
+        elif _embeddings == "pt":
+            # TODO here, the embeddings are coupled to the vocab of the train dataset
+            return EmbeddingLoader.get_pt_embedding_loader(
+                os.path.join(
+                    config["data"]["data_dir"],
+                    config["data"]["embedding_file"]
+                ))
+
+
+class PtEmbeddingLoader(EmbeddingLoader):
+    def __init__(self, path: str):
+        super().__init__()
+        self.path = path
+
+    def load_embeddings(self, device: str):
+        _embeddings = None
+        with open(self.path, 'rb') as f:
+            _embeddings = torch.load(f)
+        return _embeddings.to(device)
 
 
 class GloveEmbeddingLoader(EmbeddingLoader):
@@ -46,12 +70,14 @@ class GloveEmbeddingLoader(EmbeddingLoader):
     def load_embeddings(self, device: str):
         _embeddings = None
         with open(self.path, 'r') as f:
-            for line in f:
+            for i, line in tqdm.tqdm(enumerate(f)):
                 token, *embedding = line.split()
                 # initialize embeddings now that we know the embedding dim
                 if _embeddings is None:
                     _embeddings = torch.zeros(len(self.vocab), len(embedding), device=device)
                 embedding = [float(x) for x in embedding]
+
+                # only embed tokens that are actually in the vocab
                 if token in self.vocab:  # token will never be the pad token because embeddings are read from a file
                     numericalized_token = self.vocab[token]
                     _embeddings[numericalized_token, :] = torch.tensor(embedding, device=device)

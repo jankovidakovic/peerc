@@ -6,46 +6,91 @@ import torch
 metrics = ["loss", "accuracy", "precision", "recall", "f1"]
 
 
+# def eval_perf_multi(Y, Y_):
+#     precisions = []
+#     recalls = []
+#     n = max(Y_) + 1
+#     M = np.bincount(n * Y_ + Y, minlength=n * n).reshape(n, n)
+#     # TODO figure out how to do this without the loop
+#     for i in range(n):
+#         tp_i = M[i, i]
+#         fn_i = np.sum(M[i, :]) - tp_i
+#         fp_i = np.sum(M[:, i]) - tp_i
+#         # recall_i = 0 if tp_i + fn_i == 0 else tp_i / (tp_i + fn_i)
+#         # precision_i = 0 if tp_i + fp_i == 0 else tp_i / (tp_i + fp_i)
+#         # precisions.append(precision_i)
+#         # recalls.append(recall_i)
+#
+#     accuracy = np.trace(M) / np.sum(M)
+#
+#     return accuracy, precisions, recalls, M
+
+
 class ConfusionMatrix:
-    def __init__(self):
-        self._confusion_matrix = torch.zeros(2, 2)
+    def __init__(self, num_classes: int = 2, device: str = "cuda"):
+        self.num_classes = num_classes
+        self._confusion_matrix = torch.zeros(num_classes, num_classes, device=device)
+        self._tp = torch.zeros(num_classes, device=device)
+        self._fp = torch.zeros(num_classes, device=device)
+        self._fn = torch.zeros(num_classes, device=device)
+        self._tn = torch.zeros(num_classes, device=device)
 
-    def update(self, predictions, labels):
-        for prediction, label in zip(predictions.view(-1), labels.view(-1)):
-            self._confusion_matrix[prediction.long(), label.long()] += 1
+    def update(self, y_true, y_pred):
+        # TODO - we actually pass y_pred as y_true but this should stil work
+        # y_pred is of shape (batch_size, num_classes)
+        # y_true is of shape (batch_size)
+        self._confusion_matrix += torch.bincount(
+            self.num_classes * y_true + y_pred, minlength=self.num_classes ** 2
+            # the above line is equivalent to the following:
+            # self._confusion_matrix[y_true, y_pred] += 1
+        ).reshape(self.num_classes, self.num_classes)
 
-    @property
-    def accuracy(self):
-        accuracy = self._confusion_matrix.diag().sum() / torch.sum(self._confusion_matrix)
+        # cache tp, fp, fn
+        for i in range(self.num_classes):
+            self._tp[i] = self._confusion_matrix[i, i]
+            self._fp[i] = self._confusion_matrix[i, :].sum() - self._confusion_matrix[i, i]
+            self._fn[i] = self._confusion_matrix[:, i].sum() - self._confusion_matrix[i, i]
+            self._tn[i] = self._confusion_matrix.sum() - self._tp[i] - self._fp[i] - self._fn[i]
+
+        # for prediction, label in zip(predictions.view(-1), labels.view(-1)):
+        #    self._confusion_matrix[prediction.long(), label.long()] += 1
+
+    def accuracy(self, ignore_classes: Optional[list[int]] = None):
+        if ignore_classes is None:
+            accuracy = (self._tp.sum()) / self._confusion_matrix.sum()
+            # tn is removed
+        else:
+            include_classes = list(set(range(self.num_classes)) - set(ignore_classes))
+            accuracy = (self._tp[include_classes].sum()) \
+                       / self._confusion_matrix[include_classes, :][:, include_classes].sum()
+            # tn is removed
+
         return accuracy.item()
 
-    @property
-    def precision(self):
-        precision = self._confusion_matrix[0, 0] / (self._confusion_matrix[0, 0] + self._confusion_matrix[0, 1])
-        return precision.item()
+    # TODO lookup macro metrics
 
-    @property
-    def recall(self):
-        recall = self._confusion_matrix[0, 0] / (self._confusion_matrix[0, 0] + self._confusion_matrix[1, 0])
-        return recall.item()
+    def micro_precision(self, ignore_classes: Optional[list[int]] = None):
+        return self.accuracy(ignore_classes)  # micro-precision is the same as accuracy
 
-    @property
-    def f1(self):
-        precision = self.precision
-        recall = self.recall
-        return 2 * precision * recall / (precision + recall)
+    def micro_recall(self, ignore_classes: Optional[list[int]] = None):
+        return self.accuracy(ignore_classes)  # micro-recall is the same as accuracy
 
-    def all_metrics(self):
+    def micro_f1(self, ignore_classes: Optional[list[int]] = None):
+        return self.accuracy(ignore_classes)  # micro-f1 is the same as accuracy
+
+    def all_metrics(self, ignore_classes: Optional[list[int]] = None) -> dict:
+        f1 = self.micro_f1(ignore_classes)
+        # return metrics as a dictionary
         return {
-            "accuracy": self.accuracy,
-            "precision": self.precision,
-            "recall": self.recall,
-            "f1": self.f1
+            "micro-f1": f1,
         }
 
     @property
     def confusion_matrix(self):
         return self._confusion_matrix
+
+
+# TODO - write test for this
 
 
 class MetricStats:
@@ -72,13 +117,10 @@ class MetricStats:
 
 class MetricFactory:
     @staticmethod
-    def from_loss_and_confmat(loss, confmat, prefix: Optional[str] = None):
+    def from_loss_and_confmat(loss, confmat, prefix: Optional[str] = None, ignore_classes: Optional[list[int]] = None):
         _metrics = {
             "loss": loss,
-            "accuracy": confmat.accuracy,
-            "precision": confmat.precision,
-            "recall": confmat.recall,
-            "f1": confmat.f1,
+            "micro-f1": confmat.micro_f1(ignore_classes),
         }
         return {prefix: _metrics} if prefix else _metrics
 

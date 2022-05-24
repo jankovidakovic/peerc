@@ -38,20 +38,22 @@ class LSTMBaseline(nn.Module):
         lstm_output_size = lstm_hidden_size * (2 if lstm_bidirectional else 1)
         self.linear1 = nn.Linear(
             lstm_output_size,
-            lstm_output_size,
+            linear_hidden_size,
             device=device)
         self.linear2 = nn.Linear(
-            lstm_output_size,
+            linear_hidden_size,
             4,
             device=device)
         self.device = device
 
     def forward(self, x, lengths):
+        # lengths is on cpu here, why?
         # x is a padded sequence, embedding expects a non-padded sequence
 
         # x is time-first, embedding expects time-last ??
         # TODO hmm
         x = self.embedding(x)  # (seq_len, batch_size, embedding_dim)
+        # TODO - check how many unks
         x = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=False, enforce_sorted=False)
         packed_output, _ = self.rnn(x)
         x, unpacked_len = nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=False)  # (seq_len, batch_size, hidden_size)

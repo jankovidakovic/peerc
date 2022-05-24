@@ -6,8 +6,8 @@ import torch
 import torch.utils.data
 from torch.utils.data import DataLoader
 
-from preprocessing import get_bag_of_tokens, tokenize_data, train_dataset
-from vocab import Vocab, VocabFactory
+from preprocessing import get_bag_of_tokens, tokenize_data
+from vocab import Vocab
 
 import pandas as pd
 
@@ -47,6 +47,8 @@ def pad_collate_fn(batch, pad_index=0):
     """
 
     _texts, _labels = zip(*batch)
+    # _labels is a list of tuples, convert to list of lists
+    _labels = [list(label) for label in _labels]
     _lengths = torch.tensor([len(text) for text in _texts])
     max_len = _lengths.max()
     padded_texts = torch.zeros(len(_texts), max_len).long()
@@ -73,7 +75,7 @@ def batch_sampler(dataset, batch_size, shuffle=True):
     indices = [(i, len(text)) for i, (text, _) in enumerate(dataset)]
     if shuffle:
         # shuffle indices randomly
-        indices = torch.randperm(len(indices)).tolist()
+        np.random.shuffle(indices)
 
     # create pools of indices grouped by the length of the texts
     pooled_indices = []
@@ -100,30 +102,24 @@ def get_dataloaders(
 ):
     train_dataloader = DataLoader(
         _train,
-        batch_size=batch_size,
-        shuffle=True,
         num_workers=0,
         collate_fn=pad_collate_fn,
         batch_sampler=batch_sampler(_train, batch_size)
     )
-    val_dataloader = DataLoader(
+    dev_dataloader = DataLoader(
         _dev,
-        batch_size=eval_batch_size,
-        shuffle=False,
         num_workers=0,
         collate_fn=pad_collate_fn,
-        batch_sampler=batch_sampler(_dev, eval_batch_size)
+        batch_sampler=batch_sampler(_dev, eval_batch_size, False)
     )
     test_dataloader = DataLoader(
         _test,
-        batch_size=eval_batch_size,
-        shuffle=False,
         num_workers=0,
         collate_fn=pad_collate_fn,
-        batch_sampler=batch_sampler(_test, eval_batch_size)
+        batch_sampler=batch_sampler(_test, eval_batch_size, False)
     )
 
-    return train_dataloader, val_dataloader, test_dataloader
+    return train_dataloader, dev_dataloader, test_dataloader
 
 
 def load_data_from_path(path: str) -> pd.DataFrame:
@@ -158,7 +154,6 @@ def dataset_from_file(
         label_vocab = Vocab(label_frequencies, use_special_tokens=False)
 
     # create torch datasets
-
     dataset = NLPDataset(text_tokens, labels, text_vocab, label_vocab)
     return dataset
 
@@ -175,16 +170,16 @@ def raw_data_from_path(dataset_path: str):
     return text_tokens, labels
 
 
-def get_all_datasets(_config: dict[str, str]):
+def get_datasets(_config: dict[str, str]) -> (NLPDataset, NLPDataset, NLPDataset):
     train_path = os.path.join(_config["data_dir"], _config["train_file"])
-    dev_path = os.path.join(_config["data_dir"], _config["dev_file"])
-    test_path = os.path.join(_config["data_dir"], _config["test_file"])
-
     _train_dataset = dataset_from_file(train_path)
-    _dev_dataset = dataset_from_file(dev_path, text_vocab=train_dataset.text_vocab,
-                                     label_vocab=train_dataset.label_vocab)
-    _test_dataset = dataset_from_file(test_path, text_vocab=train_dataset.text_vocab,
-                                      label_vocab=train_dataset.label_vocab)
+
+    dev_path = os.path.join(_config["data_dir"], _config["dev_file"])
+    _dev_dataset = dataset_from_file(dev_path, text_vocab=_train_dataset.text_vocab,
+                                         label_vocab=_train_dataset.label_vocab)
+    test_path = os.path.join(_config["data_dir"], _config["test_file"])
+    _test_dataset = dataset_from_file(test_path, text_vocab=_train_dataset.text_vocab,
+                                          label_vocab=_train_dataset.label_vocab)
 
     return _train_dataset, _dev_dataset, _test_dataset
 
@@ -197,7 +192,7 @@ if __name__ == '__main__':
         "test_file": "test.txt"
     }
 
-    train_dataset, dev_dataset, test_dataset = get_all_datasets(config)
+    train_dataset, dev_dataset, test_dataset = get_datasets(config)
 
     print(f"Train dataset: {len(train_dataset)}")
     print(f"Dev dataset: {len(dev_dataset)}")
