@@ -93,33 +93,41 @@ def batch_sampler(dataset, batch_size, shuffle=True):
         yield pooled_indices[i:i + batch_size]
 
 
-def get_dataloaders(
-        _train: NLPDataset,
-        _dev: NLPDataset,
-        _test: NLPDataset,
-        batch_size: int,
-        eval_batch_size: int,
-):
-    train_dataloader = DataLoader(
-        _train,
-        num_workers=0,
-        collate_fn=pad_collate_fn,
-        batch_sampler=batch_sampler(_train, batch_size)
-    )
-    dev_dataloader = DataLoader(
-        _dev,
-        num_workers=0,
-        collate_fn=pad_collate_fn,
-        batch_sampler=batch_sampler(_dev, eval_batch_size, False)
-    )
-    test_dataloader = DataLoader(
-        _test,
-        num_workers=0,
-        collate_fn=pad_collate_fn,
-        batch_sampler=batch_sampler(_test, eval_batch_size, False)
-    )
+def get_dataloaders(*,
+                    train_dataset: Optional[NLPDataset] = None,
+                    valid_dataset: Optional[NLPDataset] = None,
+                    test_dataset: Optional[NLPDataset] = None,
+                    batch_size: int = 32,
+                    eval_batch_size: int = 32,
+                    **kwargs
+                    ):
+    dataloaders = []
 
-    return train_dataloader, dev_dataloader, test_dataloader
+    if train_dataset:
+        dataloaders.append(DataLoader(
+            train_dataset,
+            num_workers=0,
+            collate_fn=pad_collate_fn,
+            batch_sampler=batch_sampler(train_dataset, batch_size)
+        ))
+
+    if valid_dataset:
+        dataloaders.append(DataLoader(
+            valid_dataset,
+            num_workers=0,
+            collate_fn=pad_collate_fn,
+            batch_sampler=batch_sampler(valid_dataset, eval_batch_size, False)
+        ))
+
+    if test_dataset:
+        dataloaders.append(DataLoader(
+            test_dataset,
+            num_workers=0,
+            collate_fn=pad_collate_fn,
+            batch_sampler=batch_sampler(test_dataset, eval_batch_size, False)
+        ))
+
+    return dataloaders
 
 
 def load_data_from_path(path: str) -> pd.DataFrame:
@@ -176,10 +184,10 @@ def get_datasets(_config: dict[str, str]) -> (NLPDataset, NLPDataset, NLPDataset
 
     dev_path = os.path.join(_config["data_dir"], _config["dev_file"])
     _dev_dataset = dataset_from_file(dev_path, text_vocab=_train_dataset.text_vocab,
-                                         label_vocab=_train_dataset.label_vocab)
+                                     label_vocab=_train_dataset.label_vocab)
     test_path = os.path.join(_config["data_dir"], _config["test_file"])
     _test_dataset = dataset_from_file(test_path, text_vocab=_train_dataset.text_vocab,
-                                          label_vocab=_train_dataset.label_vocab)
+                                      label_vocab=_train_dataset.label_vocab)
 
     return _train_dataset, _dev_dataset, _test_dataset
 

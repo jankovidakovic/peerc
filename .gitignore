@@ -5,6 +5,8 @@ data/glove.zip
 data/glove.42B.300d.txt
 data/embeddings.pt
 prototyping.ipynb
+model.pt
+runs/**
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all

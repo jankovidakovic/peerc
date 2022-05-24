@@ -1,183 +1,305 @@
 import json
-from typing import Optional
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import math
+from typing import Optional, Iterable, Union
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
-import torch
-
-metrics = ["loss", "accuracy", "precision", "recall", "f1"]
-
-
-# def eval_perf_multi(Y, Y_):
-#     precisions = []
-#     recalls = []
-#     n = max(Y_) + 1
-#     M = np.bincount(n * Y_ + Y, minlength=n * n).reshape(n, n)
-#     # TODO figure out how to do this without the loop
-#     for i in range(n):
-#         tp_i = M[i, i]
-#         fn_i = np.sum(M[i, :]) - tp_i
-#         fp_i = np.sum(M[:, i]) - tp_i
-#         # recall_i = 0 if tp_i + fn_i == 0 else tp_i / (tp_i + fn_i)
-#         # precision_i = 0 if tp_i + fp_i == 0 else tp_i / (tp_i + fp_i)
-#         # precisions.append(precision_i)
-#         # recalls.append(recall_i)
-#
-#     accuracy = np.trace(M) / np.sum(M)
-#
-#     return accuracy, precisions, recalls, M
+default_ignore_classes: Iterable[int] = frozenset({0})
 
 
-class ConfusionMatrix:
-    def __init__(self, num_classes: int = 2, device: str = "cuda"):
+class ClassificationMetrics:
+    def __init__(self, num_classes: int = 4):
         self.num_classes = num_classes
-        self._confusion_matrix = torch.zeros(num_classes, num_classes, device=device)
-        self._tp = torch.zeros(num_classes, device=device)
-        self._fp = torch.zeros(num_classes, device=device)
-        self._fn = torch.zeros(num_classes, device=device)
-        self._tn = torch.zeros(num_classes, device=device)
-        self._yt = []
-        self._yp = []
+        self._y_true = []
+        self._y_pred = []
 
-    def update(self, y_true, y_pred):
-        # TODO - we actually pass y_pred as y_true but this should stil work
-        # y_pred is of shape (batch_size, num_classes)
-        # y_true is of shape (batch_size)
-        self._confusion_matrix += torch.bincount(
-            self.num_classes * y_true + y_pred, minlength=self.num_classes ** 2
-            # the above line is equivalent to the following:
-            # self._confusion_matrix[y_true, y_pred] += 1
-        ).reshape(self.num_classes, self.num_classes)
+    def add_data(self, y_true, y_pred) -> None:
+        """Adds the provided classification data.
 
-        # cache tp, fp, fn
-        for i in range(self.num_classes):
-            self._tp[i] = self._confusion_matrix[i, i]
-            self._fp[i] = self._confusion_matrix[i, :].sum() - self._confusion_matrix[i, i]
-            self._fn[i] = self._confusion_matrix[:, i].sum() - self._confusion_matrix[i, i]
-            self._tn[i] = self._confusion_matrix.sum() - self._tp[i] - self._fp[i] - self._fn[i]
+        Each point in the provided vector should correspond to a result of a classification.
+        That means that the vectors shouldn't be one-hot encoded.
 
-            # before caching y_true and y_pred, we need to detach them from the computation graph
-        self._yp.extend(y_true.cpu().detach().numpy())  # this is not an error
-        self._yt.extend(y_pred.cpu().detach().numpy())
-        # for prediction, label in zip(predictions.view(-1), labels.view(-1)):
-        #    self._confusion_matrix[prediction.long(), label.long()] += 1
+        :param y_true: The vector of true labels.
+        :param y_pred: The vector of predicted labels.
+        """
 
-    def accuracy(self, ignore_classes: Optional[list[int]] = None):
-        # include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
-        return accuracy_score(self._yt, self._yp)
-        # if ignore_classes is None:
-        #     accuracy = (self._tp.sum()) / self._confusion_matrix.sum()
-        #     # tn is removed
-        # else:
-        #     include_classes = list(set(range(self.num_classes)) - set(ignore_classes))
-        #     accuracy = (self._tp[include_classes].sum()) \
-        #                / self._confusion_matrix[include_classes, :][:, include_classes].sum()
-            # tn is removed
+        self._y_true.extend(y_true)
+        self._y_pred.extend(y_pred)
 
-        # return accuracy.item()
+    def accuracy(self) -> float:
+        """Returns the accuracy metric, computed on all the data added so far.
 
-    # TODO lookup macro metrics
+        :return: Accuracy score.
+        """
+        return accuracy_score(self._y_true, self._y_pred)
 
-    def micro_precision(self, ignore_classes: Optional[list[int]] = None):
-        # return self.accuracy(ignore_classes)  # micro-precision is the same as accuracy
+    def precision(self, *,
+                  average: str = "micro",
+                  ignore_classes: Optional[Iterable[int]] = default_ignore_classes) -> float:
+        """ Returns the precision score, computed on all the data added so far.
+
+        Optionally, ignores some classes. The metric can also be computed in a macro or micro
+        manner.
+
+        :param average: type of averaging. "micro" corresponds to the micro-averaging of the
+        precision, "macro" corresponds to the macro-averaging of the precision.
+        :param ignore_classes: indices of classes to ignore. Note that the indices should
+        correspond to the indices of the classes in the dataset, and that depends on the
+        way that the labels are encoded. For example, for LSTM-baseline, label "0" corresponds
+        to the class "other", but this may be different for other implementations.
+        :return: Precision score.
+        """
+
         include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
-        return precision_score(self._yt, self._yp, average="micro", labels=include_classes)
+        return precision_score(self._y_true, self._y_pred, average=average, labels=include_classes)
 
-    def micro_recall(self, ignore_classes: Optional[list[int]] = None):
+    def recall(self, *,
+               average: str = "micro",
+               ignore_classes: Optional[Iterable[int]] = default_ignore_classes) -> float:
+        """
+        Returns the recall score, computed on all the data added so far.
+
+        Optionally, ignores some classes. The metric can also be computed in a macro or micro
+        manner.
+
+        :param average: type of averaging. "micro" corresponds to the micro-averaging of the
+        recall, "macro" corresponds to the macro-averaging of the recall.
+        :param ignore_classes: indices of classes to ignore. Note that the indices should
+        correspond to the indices of the classes in the dataset, and that depends on the
+        way that the labels are encoded. For example, for LSTM-baseline, label "0" corresponds
+        to the class "other", but this may be different for other implementations.
+        :return: Recall score.
+        """
+
         include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
-        return recall_score(self._yt, self._yp, average="micro", labels=include_classes)
+        return recall_score(self._y_true, self._y_pred, average=average, labels=include_classes)
 
-    def micro_f1(self, ignore_classes: Optional[list[int]] = None):
+    def f1_score(self, *,
+                 average: str = "micro",
+                 ignore_classes: Optional[Iterable[int]] = default_ignore_classes) -> float:
+        """
+        Returns the f1-score, computed on all the data added so far.
+
+        Optionally, ignores some classes. The metric can also be computed in a macro or micro
+        manner.
+
+        :param average: type of averaging. "micro" corresponds to the micro-averaging of the
+        f1-score, "macro" corresponds to the macro-averaging of the f1-score.
+        :param ignore_classes: indices of classes to ignore. Note that the indices should
+        correspond to the indices of the classes in the dataset, and that depends on the
+        way that the labels are encoded. For example, for LSTM-baseline, label "0" corresponds
+        to the class "other", but this may be different for other implementations.
+        :return: F1 score.
+        """
+
         include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
-        return f1_score(self._yt, self._yp, average="micro", labels=include_classes)
+        return f1_score(self._y_true, self._y_pred, average=average, labels=include_classes)
 
-    def all_metrics(self, ignore_classes: Optional[list[int]] = None) -> dict:
-        accuracy = self.accuracy(ignore_classes)
-        precision = self.micro_precision(ignore_classes)
-        recall = self.micro_recall(ignore_classes)
-        f1 = self.micro_f1(ignore_classes)
+    def all_metrics(self, *,
+                    average: str = "micro",
+                    ignore_classes: Optional[Iterable[int]] = default_ignore_classes,
+                    return_info: bool = False
+                    ) -> Union[tuple[dict[str, float], dict[str, Union[int, str]]], dict[str, float]]:
+        """Computes all the metrics, and returns them in a dictionary.
+
+        :param average:  type of averaging. "micro" corresponds to the micro-averaging of the
+        metrics, "macro" corresponds to the macro-averaging of the metrics.
+        :param ignore_classes:  indices of classes to ignore. Note that the indices should
+        correspond to the indices of the classes in the dataset, and that depends on the
+        way that the labels are encoded. For example, for LSTM-baseline, label "0" corresponds
+        to the class "other", but this may be different for other implementations.
+        :param return_info:  Whether or not to return the information about metrics. If set to
+        True, two dictionaries are returned: one with the metrics, and one with the information
+        about the number of classes, the number of samples, type of averaging, and the
+        indices of the ignored classes.
+        :return: A dictionary with the metrics, or a tuple with two dictionaries, the first
+        one with the metrics, and the second one with the information about the metrics.
+        """
+
+        accuracy = self.accuracy()
+        precision = self.precision(average=average, ignore_classes=ignore_classes)
+        recall = self.recall(average=average, ignore_classes=ignore_classes)
+        _f1_score = self.f1_score(average=average, ignore_classes=ignore_classes)
         # return metrics as a dictionary
-        return {
+
+        all_metrics = {
             "accuracy": accuracy,
             "precision": precision,
             "recall": recall,
-            "f1": f1,
+            "f1_score": _f1_score,
         }
 
-    @property
+        if return_info:
+            info = {
+                "num_classes": self.num_classes,
+                "num_samples": len(self._y_true),
+                "average": average,
+                "ignore_classes": "[" + ",".join(str(i) for i in ignore_classes) + "]"
+            }
+            return all_metrics, info
+
+        return all_metrics
+
     def confusion_matrix(self):
-        return self._confusion_matrix
+        """Returns the confusion matrix, computed on all the data added so far.
 
-
-# TODO - write test for this
+        Rows correspond to the true labels, and columns correspond to the predicted labels.
+        :return: Confusion matrix.
+        """
+        return confusion_matrix(self._y_true, self._y_pred)
 
 
 class MetricStats:
-    # useful only for multiple experiments
-    def __init__(self):
-        self.sum = {name: 0 for name in metrics}
-        self.sumsq = {name: 0 for name in metrics}
-        self.n = 0
+    """Class that computes the elementary summary statistics of metrics.
 
-    def update(self, _metrics):
+    The class can be used to compute the mean, standard deviation, and standard error of
+    the metrics. Multiple metrics can be added to the class, and the statistics are computed
+    on all the metrics added so far.
+    """
+
+    def __init__(self):
+        # sums of metric values
+        self.sum: dict[str, int] = {}
+
+        # sums of metric values squared
+        self.sumsq: dict[str, int] = {}
+
+        # number of samples
+        self.n: int = 0
+
+    def update(self, _metrics: dict[str, float]) -> None:
+        """Updates the inner state with the provided values.
+
+        :param _metrics:  Dictionary with the metrics. Each key should correspond to a metric
+        name, and the value should be the metric value.
+        """
         for name, value in _metrics.items():
+            # check if the metric is in the list of metrics
+            if name not in self.sum:
+                self.sum[name] = 0
+                self.sumsq[name] = 0
             self.sum[name] += value
             self.sumsq[name] += value ** 2
         self.n += 1
 
-    def get_stats(self):
+    def get_stats(self) -> dict[str, dict[str, float]]:
+        """Returns the mean, standard deviation, and standard error of the metrics.
+
+        :return: a dictionary of summary statistics. Keys are the metric names, and the values
+        are dictionaries with the mean, standard deviation, and standard error.
+        """
+
         return {
             name: {
                 "mean": self.sum[name] / self.n,
-                "std": self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2
-            } for name in metrics
+                "std": self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2,
+                "std_err": math.sqrt(self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2) / math.sqrt(self.n)
+            } for name in self.sum
         }
+
+    # TODO - implement significance testing
 
 
 class MetricFactory:
+    """ Class that creates dictionaries with metrics.
+
+    """
+
     @staticmethod
-    def from_loss_and_confmat(loss, confmat, prefix: Optional[str] = None, ignore_classes: Optional[list[int]] = None):
-        _metrics = {
+    def from_loss_and_cls_metrics(
+            loss: float,
+            cls_metrics: ClassificationMetrics,
+            average: str = "micro",
+            ignore_classes: Optional[Iterable[int]] = default_ignore_classes):
+        """Creates a dictionary of metrics from the given parameters.
+
+        :param loss: Loss value.
+        :param cls_metrics: Classification metrics.
+        :param average: Type of averaging. "micro" corresponds to the micro-averaging of the
+        metrics, "macro" corresponds to the macro-averaging of the metrics.
+        :param ignore_classes: Indices of classes to ignore. Note that the indices should
+        correspond to the indices of the classes in the dataset, and that depends on the
+        way that the labels are encoded. For example, for LSTM-baseline, label "0" corresponds
+        to the class "other", but this may be different for other implementations.
+        :return: A dictionary with the metrics.
+        """
+        return {
             "loss": loss,
-            "accuracy": confmat.accuracy(ignore_classes),
-            "precision": confmat.micro_precision(ignore_classes),
-            "recall": confmat.micro_recall(ignore_classes),
-            "f1": confmat.micro_f1(ignore_classes),
+            **cls_metrics.all_metrics(average=average, ignore_classes=ignore_classes)
         }
-        return {prefix: _metrics} if prefix else _metrics
 
 
 class MetricLogger:
-    def __init__(self, seed: int, hyperparameters: dict, verbose=True):
-        self._verbose = verbose
-        self._hyperparameters = hyperparameters
-        self._seed = seed
-        self._metrics = {"train": {}, "test": {}}
-        if self._verbose:
+    """ Class that logs metrics.
+
+    """
+
+    def __init__(self, seed: int, hyperparameters: dict, verbose: bool = True):
+        """ Initializes the logger with all the parameters that can affect the metrics.
+
+        Metrics are stored in a dictionary. The keys correspond to the names of different
+        dataset splits, and the values are dictionaries with the metrics. For training and
+        validation splits, metrics can be saved for multiple epochs.
+
+        :param seed: random seed used for the experiment run.
+        :param hyperparameters:  Hyperparameters used for the experiment run.
+        :param verbose: if set to True, prints the hyperparameters and the seed.
+        """
+
+        self._hyperparameters: dict = hyperparameters
+        self._seed: int = seed
+        self._metrics: dict[str, dict] = {}
+        if verbose:
             print(f"Hyperparameters: {json.dumps(hyperparameters, indent=4)}")
             print(f"Seed: {seed}")
 
-    def log_train(self, epoch, train_metrics, val_metrics):
-        self._metrics["train"][epoch] = {
-            "train": train_metrics,
-            "val": val_metrics
-        }
-        if self._verbose:
-            print(f"Epoch {epoch}")
-            print(json.dumps(self._metrics["train"][epoch], indent=4))
+    @property
+    def metrics(self) -> dict[str, dict]:
+        """ Returns the metrics.
 
-    def log_test(self, test_metrics):
-        self._metrics["test"] = test_metrics
-        if self._verbose:
-            print(f"Test")
-            print(json.dumps(self._metrics["test"], indent=4))
+        :return: The metrics.
+        """
+        return self._metrics
 
-    def save_to_file(self, filename):
+    def log(self, _metrics: dict, epoch: Optional[int] = None, split: str = "train", verbose: bool = True) -> None:
+        """ Logs the metrics.
+
+        :param _metrics: a dictionary of metrics. The keys correspond to names of the metrics,
+        and the values are the values of the metrics. Any dictionary obtained by
+        calling methods from the MetricFactory class can be used.
+
+        :param epoch: epoch number. If None, the metrics are assumed to be for the test split.
+        :param split: dataset split. If epoch is None, the metrics are assumed to be for the
+        test split.
+        :param verbose: if set to True, prints the metrics.
+        :return:
+        """
+        if split not in self._metrics:
+            self._metrics[split] = {}
+        if epoch is not None:  # train or val metrics
+            self._metrics[split][epoch] = _metrics
+        else:
+            self._metrics[split] = _metrics  # test metrics
+
+        if verbose:
+            if epoch:  # if the epoch is not None
+                print(f"Epoch {epoch}", end="; ")
+            print(f"Metrics on {split}: ")
+            if epoch:
+                print(json.dumps(self._metrics[split][epoch], indent=4))
+            else:
+                print(json.dumps(self._metrics[split], indent=4))
+
+    def save_to_file(self, filename) -> None:
+        """ Saves the metrics to a file.
+
+        The metrics are saved in a JSON format.
+        The seed and the hyperparameters are saved as well.
+
+        :param filename: Name of the file
+        """
         with open(filename, 'w') as f:
             json.dump({
                 "seed": self._seed,
                 "hyperparameters": self._hyperparameters,
                 "metrics": self._metrics
             }, f, indent=4)
-
-    def get_test_metrics(self):
-        return self._metrics["test"]

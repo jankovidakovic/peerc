@@ -1,0 +1,22 @@
+name: "baseline"
+description: "Baseline LSTM model"
+data:
+  data_dir: "data"
+  train_file: "train.txt"
+  dev_file: "dev.txt"
+  test_file: "test.txt"
+  embedding_file: "embeddings.pt"
+model:
+  batch_size: 64
+  eval_batch_size: 128
+  n_epochs: 1
+  learning_rate: 0.0005
+  max_grad_notm: 0.888
+  embeddings: "pt"
+  embedding_dim: 300
+  freeze_embeddings: False
+  lstm_hidden_size: 128
+  lstm_num_layers: 2
+  lstm_bidirectional: True
+  lstm_dropout: 0.2
+  linear_hidden_size: 256

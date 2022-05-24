@@ -3,8 +3,6 @@ from typing import Union, Iterable
 import pandas as pd
 import torch
 
-# import constants
-
 
 class Vocab:
     """Model of a vocabulary.

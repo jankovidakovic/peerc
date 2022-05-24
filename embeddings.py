@@ -30,7 +30,7 @@ class EmbeddingLoader:
 
     @staticmethod
     def from_config(config):
-        _embeddings = config["hyperparams"]["embeddings"]
+        _embeddings = config["model"]["embeddings"]
         if _embeddings == "glove":
             return EmbeddingLoader.get_glove_embedding_loader(
                 os.path.join(
@@ -39,7 +39,7 @@ class EmbeddingLoader:
                 ))
         elif _embeddings == "random":
             return EmbeddingLoader.get_random_embedding_loader(
-                config["hyperparams"]["embedding_dim"]
+                config["model"]["embedding_dim"]
             )
         elif _embeddings == "pt":
             # TODO here, the embeddings are coupled to the vocab of the train dataset
@@ -94,13 +94,3 @@ class RandomEmbeddingLoader(EmbeddingLoader):
         _embeddings = torch.randn(len(self.vocab), self.embedding_dim, device=device)
         _embeddings[self.vocab.PAD_TOKEN, :] = 0
         return _embeddings
-
-
-if __name__ == '__main__':
-    pass
-    # text_vocab, label_vocab = VocabFactory.supervised_from_csv("data/sst_train_raw.csv")
-    # # embeddings = load_glove_embeddings("data/sst_glove_6b_300d.txt", text_vocab, 300)
-    # embedding_loader = EmbeddingLoader.get_glove_embedding_loader("data/sst_glove_6b_300d.txt")
-    # embedding_loader.vocab = text_vocab
-    # embeddings = embedding_loader.load_embeddings("cuda")
-    # print(embeddings[text_vocab["the"], :5])
