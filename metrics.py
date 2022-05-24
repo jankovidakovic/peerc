@@ -1,5 +1,6 @@
 import json
 from typing import Optional
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 import torch
 
@@ -34,6 +35,8 @@ class ConfusionMatrix:
         self._fp = torch.zeros(num_classes, device=device)
         self._fn = torch.zeros(num_classes, device=device)
         self._tn = torch.zeros(num_classes, device=device)
+        self._yt = []
+        self._yp = []
 
     def update(self, y_true, y_pred):
         # TODO - we actually pass y_pred as y_true but this should stil work
@@ -52,37 +55,52 @@ class ConfusionMatrix:
             self._fn[i] = self._confusion_matrix[:, i].sum() - self._confusion_matrix[i, i]
             self._tn[i] = self._confusion_matrix.sum() - self._tp[i] - self._fp[i] - self._fn[i]
 
+            # before caching y_true and y_pred, we need to detach them from the computation graph
+        self._yp.extend(y_true.cpu().detach().numpy())  # this is not an error
+        self._yt.extend(y_pred.cpu().detach().numpy())
         # for prediction, label in zip(predictions.view(-1), labels.view(-1)):
         #    self._confusion_matrix[prediction.long(), label.long()] += 1
 
     def accuracy(self, ignore_classes: Optional[list[int]] = None):
-        if ignore_classes is None:
-            accuracy = (self._tp.sum()) / self._confusion_matrix.sum()
-            # tn is removed
-        else:
-            include_classes = list(set(range(self.num_classes)) - set(ignore_classes))
-            accuracy = (self._tp[include_classes].sum()) \
-                       / self._confusion_matrix[include_classes, :][:, include_classes].sum()
+        # include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
+        return accuracy_score(self._yt, self._yp)
+        # if ignore_classes is None:
+        #     accuracy = (self._tp.sum()) / self._confusion_matrix.sum()
+        #     # tn is removed
+        # else:
+        #     include_classes = list(set(range(self.num_classes)) - set(ignore_classes))
+        #     accuracy = (self._tp[include_classes].sum()) \
+        #                / self._confusion_matrix[include_classes, :][:, include_classes].sum()
             # tn is removed
 
-        return accuracy.item()
+        # return accuracy.item()
 
     # TODO lookup macro metrics
 
     def micro_precision(self, ignore_classes: Optional[list[int]] = None):
-        return self.accuracy(ignore_classes)  # micro-precision is the same as accuracy
+        # return self.accuracy(ignore_classes)  # micro-precision is the same as accuracy
+        include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
+        return precision_score(self._yt, self._yp, average="micro", labels=include_classes)
 
     def micro_recall(self, ignore_classes: Optional[list[int]] = None):
-        return self.accuracy(ignore_classes)  # micro-recall is the same as accuracy
+        include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
+        return recall_score(self._yt, self._yp, average="micro", labels=include_classes)
 
     def micro_f1(self, ignore_classes: Optional[list[int]] = None):
-        return self.accuracy(ignore_classes)  # micro-f1 is the same as accuracy
+        include_classes = [i for i in range(self.num_classes) if i not in ignore_classes]
+        return f1_score(self._yt, self._yp, average="micro", labels=include_classes)
 
     def all_metrics(self, ignore_classes: Optional[list[int]] = None) -> dict:
+        accuracy = self.accuracy(ignore_classes)
+        precision = self.micro_precision(ignore_classes)
+        recall = self.micro_recall(ignore_classes)
         f1 = self.micro_f1(ignore_classes)
         # return metrics as a dictionary
         return {
-            "micro-f1": f1,
+            "accuracy": accuracy,
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
         }
 
     @property
@@ -120,7 +138,10 @@ class MetricFactory:
     def from_loss_and_confmat(loss, confmat, prefix: Optional[str] = None, ignore_classes: Optional[list[int]] = None):
         _metrics = {
             "loss": loss,
-            "micro-f1": confmat.micro_f1(ignore_classes),
+            "accuracy": confmat.accuracy(ignore_classes),
+            "precision": confmat.micro_precision(ignore_classes),
+            "recall": confmat.micro_recall(ignore_classes),
+            "f1": confmat.micro_f1(ignore_classes),
         }
         return {prefix: _metrics} if prefix else _metrics
 

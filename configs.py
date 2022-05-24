@@ -3,7 +3,7 @@ baseline = {
     "hyperparams": {
         "batch_size": 64,
         "eval_batch_size": 128,
-        "epochs": 50,
+        "epochs": 1,
         "lr": 5e-4,
         "max_grad_norm": 0.888,
         "embeddings": "pt",

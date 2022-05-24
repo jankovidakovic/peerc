@@ -77,13 +77,13 @@ def run(config):
             # **val_kwargs
         )
 
-        train_metrics = MetricFactory.from_loss_and_confmat(train_loss, train_confusion_matrix)
-        val_metrics = MetricFactory.from_loss_and_confmat(val_loss, val_confusion_matrix)
+        train_metrics = MetricFactory.from_loss_and_confmat(train_loss, train_confusion_matrix, ignore_classes=[0])
+        val_metrics = MetricFactory.from_loss_and_confmat(val_loss, val_confusion_matrix, ignore_classes=[0])
 
         metric_logger.log_train(epoch, train_metrics, val_metrics)
 
     test_loss, test_confusion_matrix = evaluate(model, test_dataloader, criterion)
-    test_metrics = MetricFactory.from_loss_and_confmat(test_loss, test_confusion_matrix)
+    test_metrics = MetricFactory.from_loss_and_confmat(test_loss, test_confusion_matrix, ignore_classes=[0])
     metric_logger.log_test(test_metrics)
 
     if config["save_metrics"]:
@@ -101,7 +101,7 @@ def multiple_runs_with_different_seeds(config, n_runs: int = 5, seeds: list[str]
 
     metric_stats = MetricStats()
     for i, seed in enumerate(seeds, 1):
-        config["seed"] = seed
+        config["seed"] = seed.item()
         config["run_id"] = i
         print(f"Run {i}/{n_runs}; seed {seed}")
         test_metrics = run(config)
@@ -119,6 +119,5 @@ if __name__ == '__main__':
         "seed": 7052020,
         "save_metrics": True,
     }
-    config["hyperparams"]["max_grad_norm"] = 0.5
-    multiple_runs_with_different_seeds(config, n_runs=5)
+    multiple_runs_with_different_seeds(config, n_runs=1)
     run(config)
