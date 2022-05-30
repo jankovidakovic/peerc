@@ -95,8 +95,11 @@ if __name__ == '__main__':
     #     run(1, config, args, True)
 
     wandb.login()
-    wandb.init(project="emotion-classification-using-transformers", entity="jankovidakovic")
-    wandb.run(name=args.run_name)
+    wandb.init(
+        entity="jankovidakovic",
+        project="emotion-classification-using-transformers",
+        name=args.run_name
+    )
 
     # create datasets
     train_dataset, dev_dataset, test_dataset = create_datasets_from_config(config)
