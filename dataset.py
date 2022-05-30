@@ -21,13 +21,16 @@ def concat_turns(row, special_tokens="start"):
     """
     if special_tokens == "None":
         return row["turn1"] + " " + row["turn2"] + " " + row["turn3"]
-
     elif special_tokens == "start":
         return "<A>: " + row["turn1"] + " <B>: " + row["turn2"] + " <A>: " + row["turn3"]
     # kinda important : <A> and <B> must not be treated as unk, but as special tokens
-
     elif special_tokens == "both":
         return "<A>" + row["turn1"] + "</A>" + "<B>" + row["turn2"] + "</B>" + "<A>" + row["turn3"] + "</A>"
+    elif special_tokens == "bert":
+        return "[CLS] " + " [SEP] ".join(row.values[:3]) + " [SEP]"
+        # this looks correct tho
+    else:
+        raise ValueError("Unknown concat scheme.")
 
 
 def preprocess(df, special_tokens="start"):
