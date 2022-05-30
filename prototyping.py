@@ -58,14 +58,9 @@ def get_parser():
     parser.add_argument("--config", type=str, default="experiments/adapters/test/config.yaml")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--model_name", type=str, default="distilbert-base-uncased")
-    parser.add_argument("--run_name", type=str, default="test_run")
+    parser.add_argument("--run_name", type=str, default="pfeiffer_final")
     parser.add_argument("--run_dir", type=str, default="runs/adapters")
     parser.add_argument("--n_runs", type=int, default=1)
-
-    # parser.add_argument("--seed", type=int, default=42)
-    # parser.add_argument("--verbose", action="store_true", default=True)
-    # parser.add_argument("--save_metrics", action="store_true", default=True)
-    # parser.add_argument("--save_model", action="store_true", default=True)
     return parser
 
 
@@ -90,13 +85,8 @@ if __name__ == '__main__':
         config = yaml.safe_load(f)
 
     # save cli config to a yaml file
-    # with open(f"{args.run_dir}/cli_config.yaml", "w") as f:
-    #     yaml.dump(vars(args), f)
-    #
-    # if args.n_runs > 1:
-    #     multiple_runs(config, args)
-    # else:
-    #     run(1, config, args, True)
+    with open(f"{args.run_dir}/cli_config.yaml", "w") as f:
+        yaml.dump(vars(args), f)
 
     wandb.login()
 
