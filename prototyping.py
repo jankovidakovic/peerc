@@ -6,11 +6,14 @@ from functools import partial
 import numpy as np
 import torch.cuda
 import yaml
+from transformers.adapters.configuration import AdapterConfig, PfeifferConfig
+from transformers.integrations import WandbCallback
 
 import wandb
 from datasets import Dataset, NamedSplit
-from transformers import BertTokenizer, AutoModelForSequenceClassification, TrainingArguments, IntervalStrategy, \
-    Trainer, DataCollatorWithPadding
+from transformers import BertTokenizer, TrainingArguments, IntervalStrategy, \
+    Trainer, DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback
+from transformers.adapters.models.auto import AutoAdapterModel
 
 from data import load_data_from_path
 from dataset import concat_turns, emotion2label
@@ -105,11 +108,11 @@ if __name__ == '__main__':
     # create datasets
     train_dataset, dev_dataset, test_dataset = create_datasets_from_config(config)
 
-    tokenizer = BertTokenizer.from_pretrained(args.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     partial_tokenize = partial(tokenize_function, tokenizer=tokenizer)
     train_dataset = train_dataset.map(partial_tokenize, batched=True)
     dev_dataset = dev_dataset.map(partial_tokenize, batched=True)
-    test_dataset = test_dataset.map(partial_tokenize, batched=True)
+    test_dataset = test_dataset.map(partial_tokenize, batched=False)
 
     # this isnt batched tho, it just applies batching when tokenizing
 
@@ -117,8 +120,20 @@ if __name__ == '__main__':
 
     device = torch.device(args.device)
 
-    model = AutoModelForSequenceClassification\
-        .from_pretrained(args.model_name, num_labels=4).to(device)
+    # model = AutoModelForSequenceClassification\
+    #     .from_pretrained(args.model_name, num_labels=4)
+    # model is automatically on gpu
+    # model = AutoAdapterModel.from_pretrained(args.model_name, num_labels=4)
+    model = AutoAdapterModel.from_pretrained(args.model_name)
+    # add classification head
+    model.add_classification_head("emo", num_labels=4)
+
+    adapter_config = PfeifferConfig()
+
+    model.add_adapter("emo", adapter_config)
+
+    model.train_adapter("emo")
+    model.set_active_adapters(["emo"])
 
     # TODO - add adapter (from config)
     # TODO - add optimizer (from config)
@@ -131,29 +146,36 @@ if __name__ == '__main__':
     training_args = TrainingArguments(
         output_dir=args.run_dir,
         evaluation_strategy=IntervalStrategy.STEPS,
-        # save_strategy=IntervalStrategy.STEPS,
+        save_strategy=IntervalStrategy.STEPS,
+        max_steps=10,
         report_to=["wandb"],
-        metric_for_best_model="f1-score",
+        metric_for_best_model="f1_score",
         load_best_model_at_end=True,
         **config["model"],
-        max_steps=1
     )
 
-    trainer = Trainer(
+    trainer = AdapterTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=dev_dataset,
         data_collator=DataCollatorWithPadding(tokenizer=tokenizer, padding=True),
-        # tokenizer=tokenizer,
-        compute_metrics=emo_metrics
+        tokenizer=tokenizer,
+        compute_metrics=emo_metrics,
+        callbacks=[
+            EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.01),
+        ]
     )  # optimizer used is AdamW by default
 
-    # model is on cuda, data is on cpu
+    # fix bug with tensors not being on the same device
+    old_collator = trainer.data_collator
+    trainer.data_collator = lambda data: dict(old_collator(data))
 
     trainer.train()
 
-    predictions, labels, metrics = trainer.predict(test_dataset)
+    metrics = trainer.evaluate(test_dataset)
+
+    # predictions, labels, metrics = trainer.predict(test_dataset)
 
     # save metrics to a file
     with open(os.path.join(args.run_dir, "test-metrics.json"), "w") as f:
