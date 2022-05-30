@@ -11,7 +11,7 @@ model:
   eval_batch_size: 128
   n_epochs: 1
   learning_rate: 0.0005
-  max_grad_notm: 0.888
+  max_grad_norm: 0.888
   embeddings: "pt"
   embedding_dim: 300
   freeze_embeddings: False

@@ -1,0 +1,14 @@
+name: "test"
+description: "Test experiment."
+data:
+  data_dir: "data"
+  train_file: "train.txt"
+  dev_file: "dev.txt"
+  test_file: "test.txt"
+  # embedding_file: "embeddings.pt"
+model:
+  learning_rate: 0.0005
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  weight_decay: 0.05,
+  num_train_epochs: 1

@@ -1,9 +1,12 @@
+import argparse
 import json
 import os
 from functools import partial
 
 import numpy as np
 import torch.cuda
+import yaml
+
 import wandb
 from datasets import Dataset, NamedSplit
 from transformers import BertTokenizer, AutoModelForSequenceClassification, TrainingArguments, IntervalStrategy, Trainer
@@ -46,66 +49,105 @@ def emo_metrics(eval_pred):
     return all_metrics
 
 
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="experiments/adapters/test/config.yaml")
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--model_name", type=str, default="bert-base-uncased")
+    parser.add_argument("--run_name", type=str, default="test_run")
+    parser.add_argument("--run_dir", type=str, default="runs/adapters")
+
+    # parser.add_argument("--seed", type=int, default=42)
+    # parser.add_argument("--verbose", action="store_true", default=True)
+    # parser.add_argument("--save_metrics", action="store_true", default=True)
+    # parser.add_argument("--save_model", action="store_true", default=True)
+    # parser.add_argument("--n_runs", type=int, default=3)
+    return parser
+
+
+def create_datasets_from_config(config):
+    train_path = os.path.join(config["data"]["data_dir"], config["data"]["train_file"])
+    dev_path = os.path.join(config["data"]["data_dir"], config["data"]["dev_file"])
+    test_path = os.path.join(config["data"]["data_dir"], config["data"]["test_file"])
+    _train = create_huggingface_dataset(train_path, "train")
+    _dev = create_huggingface_dataset(dev_path, "dev")
+    _test = create_huggingface_dataset(test_path, "test")
+    return _train, _dev, _test
+
+
 if __name__ == '__main__':
 
-    RUN_DIR = "runs/bert-test"
+    parser = get_parser()
+    args = parser.parse_args()
+    if not os.path.exists(args.config):
+        raise FileNotFoundError(f"Config file {args.config} not found")
+
+    with open(args.config, "r") as f:
+        config = yaml.safe_load(f)
+
+    # save cli config to a yaml file
+    # with open(f"{args.run_dir}/cli_config.yaml", "w") as f:
+    #     yaml.dump(vars(args), f)
+    #
+    # if args.n_runs > 1:
+    #     multiple_runs(config, args)
+    # else:
+    #     run(1, config, args, True)
 
     wandb.login()
     wandb.init(project="emotion-classification-using-transformers", entity="jankovidakovic")
+    wandb.run(name=args.run_name)
 
-    train_data = create_huggingface_dataset("data/train.txt", "train")
-    dev_data = create_huggingface_dataset("data/dev.txt", "dev")
-    test_data = create_huggingface_dataset("data/test.txt", "test")
+    # create datasets
+    train_dataset, dev_dataset, test_dataset = create_datasets_from_config(config)
 
-    tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-    # encodings = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
-
-    # print(len(encodings))
-    # sample_text = df.iloc[0]["text"]
-
+    tokenizer = BertTokenizer.from_pretrained(args.model_name)
     partial_tokenize = partial(tokenize_function, tokenizer=tokenizer)
-    train_data = train_data.map(partial_tokenize, batched=True)
-    dev_data = dev_data.map(partial_tokenize, batched=True)
+    train_dataset = train_dataset.map(partial_tokenize, batched=True)
+    dev_dataset = dev_dataset.map(partial_tokenize, batched=True)
+    test_dataset = test_dataset.map(partial_tokenize, batched=True)
     # this isnt batched tho, it just applies batching when tokenizing
 
     # this seems to be the way
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(args.device)
 
     model = AutoModelForSequenceClassification\
-        .from_pretrained("bert-base-cased", num_labels=4).to(device)
+        .from_pretrained(args.model_name, num_labels=4).to(device)
 
     # TODO - add adapter (from config)
+    # TODO - add optimizer (from config)
+    # TODO - add scheduler (from config)
+
+    # create run dir if it doesnt exist
+    if not os.path.exists(args.run_dir):
+        os.mkdir(args.run_dir)
 
     training_args = TrainingArguments(
-        output_dir="runs/bert-test",
+        output_dir=args.run_dir,
         evaluation_strategy=IntervalStrategy.EPOCH,
         save_strategy=IntervalStrategy.EPOCH,
-        learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=50,
-        weight_decay=0.05,
         report_to=["wandb"],
         metric_for_best_model="f1-score",
-        load_best_model_at_end=True
+        load_best_model_at_end=True,
+        **config["model"]
     )
 
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=train_data,
-        eval_dataset=dev_data,
-        tokenizer=tokenizer,
+        train_dataset=train_dataset,
+        eval_dataset=dev_dataset,
+        # tokenizer=tokenizer,
         compute_metrics=emo_metrics
-    )
+    )  # optimizer used is AdamW by default
 
     trainer.train()
 
-    predictions, labels, metrics = trainer.predict(test_data)
+    predictions, labels, metrics = trainer.predict(test_dataset)
 
     # save metrics to a file
-    with open(os.path.join(RUN_DIR, "test-metrics.json"), "w") as f:
+    with open(os.path.join(args.run_dir, "test-metrics.json"), "w") as f:
         json.dump(metrics, f)
 
     wandb.finish()
