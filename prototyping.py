@@ -41,7 +41,7 @@ def emo_metrics(eval_pred):
     y_pred, y_true = eval_pred
 
     # convert y_pred to logits
-    y_pred = np.argmax(y_pred, axis=2)
+    y_pred = np.argmax(y_pred, axis=-1)
 
     metric_calc = ClassificationMetrics()
     metric_calc.add_data(y_true, y_pred)
@@ -129,8 +129,8 @@ if __name__ == '__main__':
 
     training_args = TrainingArguments(
         output_dir=args.run_dir,
-        evaluation_strategy=IntervalStrategy.EPOCH,
-        save_strategy=IntervalStrategy.EPOCH,
+        evaluation_strategy=IntervalStrategy.STEPS,
+        # save_strategy=IntervalStrategy.STEPS,
         report_to=["wandb"],
         metric_for_best_model="f1-score",
         load_best_model_at_end=True,
