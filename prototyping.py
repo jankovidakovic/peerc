@@ -10,7 +10,7 @@ import yaml
 import wandb
 from datasets import Dataset, NamedSplit
 from transformers import BertTokenizer, AutoModelForSequenceClassification, TrainingArguments, IntervalStrategy, \
-    Trainer, DataCollator, DataCollatorWithPadding
+    Trainer, DataCollatorWithPadding
 
 from data import load_data_from_path
 from dataset import concat_turns, emotion2label
@@ -54,7 +54,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="experiments/adapters/test/config.yaml")
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--model_name", type=str, default="bert-base-uncased")
+    parser.add_argument("--model_name", type=str, default="distilbert-base-uncased")
     parser.add_argument("--run_name", type=str, default="test_run")
     parser.add_argument("--run_dir", type=str, default="runs/adapters")
 
@@ -110,6 +110,7 @@ if __name__ == '__main__':
     train_dataset = train_dataset.map(partial_tokenize, batched=True)
     dev_dataset = dev_dataset.map(partial_tokenize, batched=True)
     test_dataset = test_dataset.map(partial_tokenize, batched=True)
+
     # this isnt batched tho, it just applies batching when tokenizing
 
     # this seems to be the way
@@ -135,7 +136,7 @@ if __name__ == '__main__':
         metric_for_best_model="f1-score",
         load_best_model_at_end=True,
         **config["model"],
-        max_steps=100
+        max_steps=1
     )
 
     trainer = Trainer(
@@ -147,6 +148,8 @@ if __name__ == '__main__':
         # tokenizer=tokenizer,
         compute_metrics=emo_metrics
     )  # optimizer used is AdamW by default
+
+    # model is on cuda, data is on cpu
 
     trainer.train()
 
