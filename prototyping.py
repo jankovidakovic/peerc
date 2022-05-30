@@ -10,7 +10,7 @@ import yaml
 import wandb
 from datasets import Dataset, NamedSplit
 from transformers import BertTokenizer, AutoModelForSequenceClassification, TrainingArguments, IntervalStrategy, \
-    Trainer, DataCollator
+    Trainer, DataCollator, DataCollatorWithPadding
 
 from data import load_data_from_path
 from dataset import concat_turns, emotion2label
@@ -18,7 +18,7 @@ from metrics import ClassificationMetrics
 
 
 def tokenize_function(examples, tokenizer):
-    return tokenizer(examples["text"], padding=True, truncation=True)
+    return tokenizer(examples["text"])
 
 
 def dataset_from_pandas(df, split):
@@ -142,7 +142,7 @@ if __name__ == '__main__':
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=dev_dataset,
-        data_collator=DataCollator(return_tensors="pt", pad_to_max_length=True),
+        data_collator=DataCollatorWithPadding(tokenizer=tokenizer, padding=True),
         # tokenizer=tokenizer,
         compute_metrics=emo_metrics
     )  # optimizer used is AdamW by default
