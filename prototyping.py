@@ -17,7 +17,7 @@ from transformers.adapters.models.auto import AutoAdapterModel
 
 from data import load_data_from_path
 from dataset import concat_turns, emotion2label
-from metrics import ClassificationMetrics
+from metrics import ClassificationMetrics, MetricStats
 
 
 def tokenize_function(examples, tokenizer):
@@ -60,12 +60,12 @@ def get_parser():
     parser.add_argument("--model_name", type=str, default="distilbert-base-uncased")
     parser.add_argument("--run_name", type=str, default="test_run")
     parser.add_argument("--run_dir", type=str, default="runs/adapters")
+    parser.add_argument("--n_runs", type=int, default=1)
 
     # parser.add_argument("--seed", type=int, default=42)
     # parser.add_argument("--verbose", action="store_true", default=True)
     # parser.add_argument("--save_metrics", action="store_true", default=True)
     # parser.add_argument("--save_model", action="store_true", default=True)
-    # parser.add_argument("--n_runs", type=int, default=3)
     return parser
 
 
@@ -99,6 +99,7 @@ if __name__ == '__main__':
     #     run(1, config, args, True)
 
     wandb.login()
+
     wandb.init(
         entity="jankovidakovic",
         project="emotion-classification-using-transformers",
@@ -120,60 +121,82 @@ if __name__ == '__main__':
 
     device = torch.device(args.device)
 
-    # model = AutoModelForSequenceClassification\
-    #     .from_pretrained(args.model_name, num_labels=4)
-    # model is automatically on gpu
-    # model = AutoAdapterModel.from_pretrained(args.model_name, num_labels=4)
-    model = AutoAdapterModel.from_pretrained(args.model_name)
-    # add classification head
-    model.add_classification_head("emo", num_labels=4)
+    metric_stats = MetricStats()
 
-    adapter_config = PfeifferConfig()
+    for i in range(1, args.n_runs+1):
 
-    model.add_adapter("emo", adapter_config)
+        wandb.init(
+            entity="jankovidakovic",
+            project="emotion-classification-using-transformers",
+            name=f"{args.run_name}_{i}"
+        )
 
-    model.train_adapter("emo")
-    model.set_active_adapters(["emo"])
+        model = AutoAdapterModel.from_pretrained(args.model_name)
+        # add classification head
+        model.add_classification_head("emo", num_labels=4)
 
-    # create run dir if it doesnt exist
-    if not os.path.exists(args.run_dir):
-        os.mkdir(args.run_dir)
+        adapter_config = PfeifferConfig()
 
-    training_args = TrainingArguments(
-        output_dir=args.run_dir,
-        evaluation_strategy=IntervalStrategy.EPOCH,
-        save_strategy=IntervalStrategy.EPOCH,
-        report_to=["wandb"],
-        metric_for_best_model="f1_score",
-        load_best_model_at_end=True,
-        **config["model"],
-    )
+        model.add_adapter("emo", adapter_config)
 
-    trainer = AdapterTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=dev_dataset,
-        data_collator=DataCollatorWithPadding(tokenizer=tokenizer, padding=True),
-        tokenizer=tokenizer,
-        compute_metrics=emo_metrics,
-        callbacks=[
-            EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.01),
-        ]
-    )  # optimizer used is AdamW by default
+        model.train_adapter("emo")
+        model.set_active_adapters(["emo"])
 
-    # fix bug with tensors not being on the same device
-    old_collator = trainer.data_collator
-    trainer.data_collator = lambda data: dict(old_collator(data))
+        # create run dir if it doesnt exist
+        if not os.path.exists(args.run_dir):
+            os.mkdir(args.run_dir)
 
-    trainer.train()
+        run_dir = os.path.join(args.run_dir, f"{args.run_name}_{i}")
+        os.mkdir(run_dir)
 
-    metrics = trainer.evaluate(test_dataset)
+        training_args = TrainingArguments(
+            output_dir=run_dir,
+            evaluation_strategy=IntervalStrategy.EPOCH,
+            save_strategy=IntervalStrategy.EPOCH,
+            report_to=["wandb"],
+            metric_for_best_model="f1_score",
+            load_best_model_at_end=True,
+            **config["model"],
+        )
 
-    # predictions, labels, metrics = trainer.predict(test_dataset)
+        trainer = AdapterTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=dev_dataset,
+            data_collator=DataCollatorWithPadding(tokenizer=tokenizer, padding=True),
+            tokenizer=tokenizer,
+            compute_metrics=emo_metrics,
+            callbacks=[
+                EarlyStoppingCallback(early_stopping_patience=10, early_stopping_threshold=0.001),
+            ]
+        )  # optimizer used is AdamW by default
 
-    # save metrics to a file
-    with open(os.path.join(args.run_dir, "test-metrics.json"), "w") as f:
-        json.dump(metrics, f)
+        # fix bug with tensors not being on the same device
+        old_collator = trainer.data_collator
+        trainer.data_collator = lambda data: dict(old_collator(data))
 
-    wandb.finish()
+        trainer.train()
+
+        metrics = trainer.evaluate(test_dataset)
+
+        metric_stats.update({
+            "f1_score": metrics["eval_f1_score"],
+            "accuracy": metrics["eval_accuracy"],
+            "loss": metrics["eval_loss"],
+            "precision": metrics["eval_precision"],
+            "recall": metrics["eval_recall"],
+        })
+
+        # save metrics to a file
+        with open(os.path.join(run_dir, "metrics.json"), "w") as f:
+            json.dump(metrics, f)
+
+        wandb.finish()
+
+    wandb.join()
+
+    stats = metric_stats.get_stats()
+    save_path = f"{args.run_dir}/metric_stats.json"
+    with open(save_path, "w") as f:
+        json.dump(stats, f, indent=2)
