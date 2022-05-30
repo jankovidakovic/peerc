@@ -17,7 +17,7 @@ from metrics import ClassificationMetrics
 
 
 def tokenize_function(examples, tokenizer):
-    return tokenizer(examples["text"], padding=True, truncation=True, return_tensors="pt")
+    return tokenizer(examples["text"], padding=True, truncation=True)
 
 
 def dataset_from_pandas(df, split):
