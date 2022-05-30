@@ -21,3 +21,4 @@ dependencies:
   - pip:
     - adapter-transformers==2.3.0
     - wandb==0.12.17
+    - datasets==2.2.1
