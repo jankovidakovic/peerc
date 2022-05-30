@@ -134,7 +134,8 @@ if __name__ == '__main__':
         report_to=["wandb"],
         metric_for_best_model="f1-score",
         load_best_model_at_end=True,
-        **config["model"]
+        **config["model"],
+        max_steps=100
     )
 
     trainer = Trainer(
