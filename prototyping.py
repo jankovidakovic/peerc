@@ -135,19 +135,14 @@ if __name__ == '__main__':
     model.train_adapter("emo")
     model.set_active_adapters(["emo"])
 
-    # TODO - add adapter (from config)
-    # TODO - add optimizer (from config)
-    # TODO - add scheduler (from config)
-
     # create run dir if it doesnt exist
     if not os.path.exists(args.run_dir):
         os.mkdir(args.run_dir)
 
     training_args = TrainingArguments(
         output_dir=args.run_dir,
-        evaluation_strategy=IntervalStrategy.STEPS,
-        save_strategy=IntervalStrategy.STEPS,
-        max_steps=10,
+        evaluation_strategy=IntervalStrategy.EPOCH,
+        save_strategy=IntervalStrategy.EPOCH,
         report_to=["wandb"],
         metric_for_best_model="f1_score",
         load_best_model_at_end=True,

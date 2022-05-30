@@ -8,7 +8,7 @@ data:
   # embedding_file: "embeddings.pt"
 model:
   learning_rate: 0.0001
-  per_device_train_batch_size: 8
-  per_device_eval_batch_size: 8
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 16
   weight_decay: 0
   num_train_epochs: 30
