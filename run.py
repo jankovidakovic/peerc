@@ -155,6 +155,7 @@ if __name__ == '__main__':
             report_to=["wandb"],
             metric_for_best_model="f1_score",
             load_best_model_at_end=True,
+            save_total_limit=1,  # save only the best model
             **config["model"],
         )
 
@@ -176,6 +177,11 @@ if __name__ == '__main__':
         trainer.data_collator = lambda data: dict(old_collator(data))
 
         trainer.train()
+
+        # after training, the best model is loaded.
+        # however, the model is not on the same device as the trainer
+        # so we need to move it to the correct device
+        model.to(device)
 
         metrics = trainer.evaluate(test_dataset)
 
