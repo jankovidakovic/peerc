@@ -60,7 +60,7 @@ def emo_metrics(eval_pred):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="experiments/adapters/test/adapter-bottleneck.yaml")
+    parser.add_argument("--config", type=str, default="experiments/adapter-bottleneck.yaml")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--model_name", type=str, default="roberta-base")
     parser.add_argument("--run_name", type=str, default="pfeiffer_final")
@@ -95,12 +95,6 @@ if __name__ == '__main__':
 
     wandb.login()
 
-    wandb.init(
-        entity="jankovidakovic",
-        project="emotion-classification-using-transformers",
-        name=args.run_name
-    )
-
     # create datasets
     train_dataset, dev_dataset, test_dataset = create_datasets_from_config(config)
 
@@ -111,7 +105,6 @@ if __name__ == '__main__':
     test_dataset = test_dataset.map(partial_tokenize, batched=False)
 
     # this isnt batched tho, it just applies batching when tokenizing
-
     # this seems to be the way
 
     device = torch.device(args.device)
@@ -123,14 +116,21 @@ if __name__ == '__main__':
         wandb.init(
             entity="jankovidakovic",
             project="emotion-classification-using-transformers",
-            name=f"{args.run_name}_{i}"
+            name=f"{args.run_name}_{i}",
         )
+
+        # generate a random seed
+        seed = np.random.randint(0, 2**32)
+        wandb.config.seed = seed
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        torch.cuda.manual_seed(seed)
 
         model = AutoAdapterModel.from_pretrained(args.model_name)
         # add classification head
         model.add_classification_head("emo", num_labels=4)
 
-        adapter_config = PfeifferConfig()
+        adapter_config = PfeifferConfig()  # TODO - make configurable
 
         model.add_adapter("emo", adapter_config)
 
@@ -163,7 +163,7 @@ if __name__ == '__main__':
             tokenizer=tokenizer,
             compute_metrics=emo_metrics,
             callbacks=[
-                EarlyStoppingCallback(early_stopping_patience=10, early_stopping_threshold=0.001),
+               EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.001),
             ]
         )  # optimizer used is AdamW by default
 
@@ -175,13 +175,17 @@ if __name__ == '__main__':
 
         metrics = trainer.evaluate(test_dataset)
 
-        metric_stats.update({
+        eval_metrics = {
             "f1_score": metrics["eval_f1_score"],
             "accuracy": metrics["eval_accuracy"],
             "loss": metrics["eval_loss"],
             "precision": metrics["eval_precision"],
             "recall": metrics["eval_recall"],
-        })
+        }
+
+        metric_stats.update(eval_metrics)
+
+        wandb.log(eval_metrics)
 
         # save metrics to a file
         with open(os.path.join(run_dir, "metrics.json"), "w") as f:
