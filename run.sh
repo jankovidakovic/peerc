@@ -1,8 +1,8 @@
-python run.py \
-	--config experiments/adapters/test/config.yaml \
+WANDB_LOG_MODEL=true python run.py \
+	--config experiments/adapter-test.yaml \
 	--device cuda \
-	--model_name distilbert-base-uncased \
-	--run_name test_before_final \
-	--run_dir runs/adapters/test_before_final \
+	--model_name "roberta-base" \
+	--run_name "roberta-test" \
+	--run_dir "runs/test/roberta" \
 	--n_runs 2
 
