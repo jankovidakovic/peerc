@@ -88,6 +88,10 @@ if __name__ == '__main__':
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
 
+    # create a run dir if it doesn't exist
+    if not os.path.exists(args.run_dir):
+        os.makedirs(args.run_dir)
+
     # save cli config to a yaml file
     with open(f"{args.run_dir}/cli_config.yaml", "w") as f:
         yaml.dump(vars(args), f)
