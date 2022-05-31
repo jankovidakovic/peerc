@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable
+from typing import Callable, Optional
 
 import pandas as pd
 
@@ -7,7 +7,7 @@ label2emotion = {0: "others", 1: "happy", 2: "sad", 3: "angry"}
 emotion2label = {"others": 0, "happy": 1, "sad": 2, "angry": 3}
 
 
-def concat_turns(row, special_tokens="start"):
+def concat_turns(row, concat_strategy: Optional[str] = None):
     """
     Concatenate context adding special tokens to indicate which user is speaking.
 
@@ -16,21 +16,26 @@ def concat_turns(row, special_tokens="start"):
     "both" - add a special token when a users turn begins and when it ends
 
     :param row:
-    :param special_tokens:
+    :param concat_strategy:
     :return:
     """
-    if special_tokens == "None":
+    if concat_strategy is None:  # concat using whitespace
         return row["turn1"] + " " + row["turn2"] + " " + row["turn3"]
-    elif special_tokens == "start":
+    elif concat_strategy == "start":
         return "<A>: " + row["turn1"] + " <B>: " + row["turn2"] + " <A>: " + row["turn3"]
     # kinda important : <A> and <B> must not be treated as unk, but as special tokens
-    elif special_tokens == "both":
+    elif concat_strategy == "both":
         return "<A>" + row["turn1"] + "</A>" + "<B>" + row["turn2"] + "</B>" + "<A>" + row["turn3"] + "</A>"
-    elif special_tokens == "bert":
+    elif concat_strategy == "bert":
         return "[CLS] " + " [SEP] ".join(row.values[:3]) + " [SEP]"
         # this looks correct tho
+    elif concat_strategy == "roberta":
+        return "<s>HUMAN: "\
+               + row["turn1"] + "</s></s>BOT: "\
+               + row["turn2"] + "</s></s>HUMAN: "\
+               + row["turn3"] + "</s>"  # this should be encoded without special characters then
     else:
-        raise ValueError("Unknown concat scheme.")
+        raise ValueError("Unknown concat strategy.")
 
 
 def preprocess(df, special_tokens="start"):

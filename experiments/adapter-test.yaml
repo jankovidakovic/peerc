@@ -1,5 +1,6 @@
-name: "test"
-description: "Test experiment."
+name: "adapter-test"
+description: "Test for the adapter fine-tuning configuration."
+# data is redundant, present in every file. move to data.yaml
 data:
   data_dir: "data"
   train_file: "train.txt"
@@ -10,4 +11,4 @@ model:
   per_device_train_batch_size: 16
   per_device_eval_batch_size: 16
   weight_decay: 0.01
-  num_train_epochs: 30
+  num_train_epochs: 1

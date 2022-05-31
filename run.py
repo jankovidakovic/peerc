@@ -6,13 +6,12 @@ from functools import partial
 import numpy as np
 import torch.cuda
 import yaml
-from transformers.adapters.configuration import AdapterConfig, PfeifferConfig
-from transformers.integrations import WandbCallback
+from transformers.adapters.configuration import PfeifferConfig
 
 import wandb
 from datasets import Dataset, NamedSplit
-from transformers import BertTokenizer, TrainingArguments, IntervalStrategy, \
-    Trainer, DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback
+from transformers import TrainingArguments, IntervalStrategy, \
+    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback
 from transformers.adapters.models.auto import AutoAdapterModel
 
 from data import load_data_from_path
@@ -20,8 +19,14 @@ from dataset import concat_turns, emotion2label
 from metrics import ClassificationMetrics, MetricStats
 
 
-def tokenize_function(examples, tokenizer):
-    return tokenizer(examples["text"])
+def tokenize_function(examples, tokenizer, add_special_tokens=False):
+    # we don't add special tokens because they are already added during concatenation
+    # they cannot be added automatically since roberta supports only two sequences,
+    # but in our case we have 3 sequences
+    # it has been empirically shown that roberta can handle multiple sequences.
+    # more info: https://arxiv.org/pdf/2108.12009.pdf
+
+    return tokenizer(examples["text"], add_special_tokens=add_special_tokens)
 
 
 def dataset_from_pandas(df, split):
@@ -31,10 +36,10 @@ def dataset_from_pandas(df, split):
     )
 
 
-def create_huggingface_dataset(path, split):
+def create_huggingface_dataset(path, split, concat_stratey="roberta"):
     # load data from path
     df = load_data_from_path(path)
-    df["text"] = df.apply(lambda row: concat_turns(row, special_tokens="None"), axis=1).tolist()
+    df["text"] = df.apply(lambda row: concat_turns(row, concat_stratey), axis=1).tolist()
     df["label"] = df.apply(lambda row: emotion2label[row["label"]], axis=1).tolist()
     dataset = dataset_from_pandas(df.loc[:, ["text", "label"]], split)
     return dataset
@@ -55,9 +60,9 @@ def emo_metrics(eval_pred):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="experiments/adapters/test/config.yaml")
+    parser.add_argument("--config", type=str, default="experiments/adapters/test/adapter-bottleneck.yaml")
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--model_name", type=str, default="distilbert-base-uncased")
+    parser.add_argument("--model_name", type=str, default="roberta-base")
     parser.add_argument("--run_name", type=str, default="pfeiffer_final")
     parser.add_argument("--run_dir", type=str, default="runs/adapters")
     parser.add_argument("--n_runs", type=int, default=1)
@@ -75,7 +80,6 @@ def create_datasets_from_config(config):
 
 
 if __name__ == '__main__':
-
     parser = get_parser()
     args = parser.parse_args()
     if not os.path.exists(args.config):
@@ -87,6 +91,7 @@ if __name__ == '__main__':
     # save cli config to a yaml file
     with open(f"{args.run_dir}/cli_config.yaml", "w") as f:
         yaml.dump(vars(args), f)
+        # seeds will be saved in wandb
 
     wandb.login()
 

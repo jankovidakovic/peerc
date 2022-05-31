@@ -26,7 +26,7 @@ def load_config_from_yaml(filename):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="experiments/baseline/lstm/config.yaml")
+    parser.add_argument("--config", type=str, default="experiments/baseline/lstm/adapter-bottleneck.yaml")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--verbose", action="store_true", default=True)
@@ -40,7 +40,7 @@ def get_parser():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="experiments/baseline/lstm/config.yaml")
+    parser.add_argument("--config", type=str, default="experiments/baseline/lstm/adapter-bottleneck.yaml")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--verbose", action="store_true", default=True)
     parser.add_argument("--embedding_output_path", type=str, default="data/embeddings.pt")
