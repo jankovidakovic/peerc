@@ -123,7 +123,10 @@ if __name__ == '__main__':
             entity="jankovidakovic",
             project="emotion-classification-using-transformers",
             name=f"{args.run_name}_{i}",
+            allow_val_change=True
         )
+
+        print(wandb.config)
 
         # generate a random seed
         seed = np.random.randint(0, 2 ** 32)
