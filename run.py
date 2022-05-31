@@ -12,7 +12,7 @@ from transformers.adapters.configuration import PfeifferConfig
 import wandb
 from datasets import Dataset, NamedSplit
 from transformers import TrainingArguments, IntervalStrategy, \
-    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback, SchedulerType
+    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback, SchedulerType, get_scheduler
 from transformers.adapters.models.auto import AutoAdapterModel
 from transformers.training_args import OptimizerNames
 
@@ -117,7 +117,7 @@ if __name__ == '__main__':
 
     metric_stats = MetricStats()
 
-    for i in range(1, args.n_runs+1):
+    for i in range(1, args.n_runs + 1):
 
         wandb.init(
             entity="jankovidakovic",
@@ -126,7 +126,7 @@ if __name__ == '__main__':
         )
 
         # generate a random seed
-        seed = np.random.randint(0, 2**32)
+        seed = np.random.randint(0, 2 ** 32)
         torch.manual_seed(seed)
         np.random.seed(seed)
         torch.cuda.manual_seed(seed)
@@ -148,10 +148,12 @@ if __name__ == '__main__':
 
         # create run dir if it doesnt exist
         if not os.path.exists(args.run_dir):
-            os.mkdir(args.run_dir)
+            os.makedirs(args.run_dir)
 
         run_dir = os.path.join(args.run_dir, f"{args.run_name}_{i}")
-        os.mkdir(run_dir)
+
+        if not os.path.exists(run_dir):
+            os.makedirs(run_dir)
 
         training_args = TrainingArguments(
             output_dir=run_dir,
@@ -168,13 +170,13 @@ if __name__ == '__main__':
 
         # create torch adamw optimizer
         optimizer = AdamW(model.parameters(), lr=training_args.learning_rate)
+        scheduler = get_scheduler(SchedulerType.LINEAR, optimizer)
 
         # create linear learning rate scheduler
 
-
-
         trainer = AdapterTrainer(
             model=model,
+            optimizers=(optimizer, scheduler),
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=dev_dataset,
@@ -182,9 +184,9 @@ if __name__ == '__main__':
             tokenizer=tokenizer,
             compute_metrics=emo_metrics,
             callbacks=[
-               EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.001),
+                EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.001),
             ]
-        )  # optimizer used is AdamW by default
+        )
 
         # fix bug with tensors not being on the same device
         old_collator = trainer.data_collator
