@@ -6,13 +6,15 @@ from functools import partial
 import numpy as np
 import torch.cuda
 import yaml
+from torch.optim import AdamW
 from transformers.adapters.configuration import PfeifferConfig
 
 import wandb
 from datasets import Dataset, NamedSplit
 from transformers import TrainingArguments, IntervalStrategy, \
-    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback
+    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback, SchedulerType
 from transformers.adapters.models.auto import AutoAdapterModel
+from transformers.training_args import OptimizerNames
 
 from data import load_data_from_path
 from dataset import concat_turns, emotion2label
@@ -125,10 +127,13 @@ if __name__ == '__main__':
 
         # generate a random seed
         seed = np.random.randint(0, 2**32)
-        wandb.config.seed = seed
         torch.manual_seed(seed)
         np.random.seed(seed)
         torch.cuda.manual_seed(seed)
+
+        wandb.config.update({"seed": seed})
+
+        print(wandb.config)
 
         model = AutoAdapterModel.from_pretrained(args.model_name)
         # add classification head
@@ -156,8 +161,17 @@ if __name__ == '__main__':
             metric_for_best_model="f1_score",
             load_best_model_at_end=True,
             save_total_limit=1,  # save only the best model
+            optim=OptimizerNames.ADAMW_TORCH,
+            lr_scheduler_type=SchedulerType.LINEAR,
             **config["model"],
         )
+
+        # create torch adamw optimizer
+        optimizer = AdamW(model.parameters(), lr=training_args.learning_rate)
+
+        # create linear learning rate scheduler
+
+
 
         trainer = AdapterTrainer(
             model=model,
