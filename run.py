@@ -81,6 +81,42 @@ def create_datasets_from_config(config):
     return _train, _dev, _test
 
 
+def model_init(model_name: str):
+    model = AutoAdapterModel.from_pretrained(model_name)
+    # add classification head
+    model.add_classification_head("emo", num_labels=4)
+
+    adapter_config = PfeifferConfig()  # TODO - make configurable
+
+    model.add_adapter("emo", adapter_config)
+
+    model.train_adapter("emo")
+    model.set_active_adapters(["emo"])
+
+    return model
+
+
+def set_seed(seed: int):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    # make sure that all randomness is deterministic
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+class ReproducibleTrainer(AdapterTrainer):
+    # create optimizer and scheduler
+    def create_optimizer_and_scheduler(self, num_training_steps: int):
+        self.optimizer = AdamW(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
+        self.scheduler = get_scheduler(
+            SchedulerType.LINEAR,
+            self.optimizer,
+            num_warmup_steps=0,
+            num_training_steps=num_training_steps)
+
+
 if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
@@ -126,28 +162,11 @@ if __name__ == '__main__':
             allow_val_change=True
         )
 
-        print(wandb.config)
-
         # generate a random seed
         seed = np.random.randint(0, 2 ** 32)
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        torch.cuda.manual_seed(seed)
+        set_seed(seed)
 
         wandb.config.update({"seed": seed})
-
-        print(wandb.config)
-
-        model = AutoAdapterModel.from_pretrained(args.model_name)
-        # add classification head
-        model.add_classification_head("emo", num_labels=4)
-
-        adapter_config = PfeifferConfig()  # TODO - make configurable
-
-        model.add_adapter("emo", adapter_config)
-
-        model.train_adapter("emo")
-        model.set_active_adapters(["emo"])
 
         # create run dir if it doesnt exist
         if not os.path.exists(args.run_dir):
@@ -169,25 +188,15 @@ if __name__ == '__main__':
             optim=OptimizerNames.ADAMW_TORCH,
             lr_scheduler_type=SchedulerType.LINEAR,
             **config["model"],
+            seed=seed,
         )
 
-        # create torch adamw optimizer
-        optimizer = AdamW(model.parameters(), lr=training_args.learning_rate)
         total_optimization_steps = \
-            training_args.num_train_epochs\
+            training_args.num_train_epochs \
             * (len(train_dataset) // (training_args.per_device_train_batch_size * training_args.n_gpu))
 
-        scheduler = get_scheduler(
-            SchedulerType.LINEAR,
-            optimizer,
-            num_warmup_steps=0,
-            num_training_steps=total_optimization_steps)
-
-        # create linear learning rate scheduler
-
-        trainer = AdapterTrainer(
-            model=model,
-            optimizers=(optimizer, scheduler),
+        trainer = ReproducibleTrainer(
+            model_init=lambda: model_init(args.model_name),
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=dev_dataset,
@@ -198,6 +207,7 @@ if __name__ == '__main__':
                 EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.001),
             ]
         )
+        trainer.create_optimizer_and_scheduler(total_optimization_steps)
 
         # fix bug with tensors not being on the same device
         old_collator = trainer.data_collator
@@ -208,7 +218,7 @@ if __name__ == '__main__':
         # after training, the best model is loaded.
         # however, the model is not on the same device as the trainer
         # so we need to move it to the correct device
-        model.to(device)
+        trainer.model.to(device)
 
         metrics = trainer.evaluate(test_dataset)
 
