@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
         # create torch adamw optimizer
         optimizer = AdamW(model.parameters(), lr=training_args.learning_rate)
-        scheduler = get_scheduler(SchedulerType.LINEAR, optimizer)
+        scheduler = get_scheduler(SchedulerType.LINEAR, optimizer, num_warmup_steps=0)
 
         # create linear learning rate scheduler
 
