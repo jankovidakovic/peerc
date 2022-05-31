@@ -187,8 +187,8 @@ if __name__ == '__main__':
         model = model_init(args.model_name)
         optimizer = AdamW(model.parameters(), lr=training_args.learning_rate, weight_decay=training_args.weight_decay)
         scheduler = get_scheduler(
-            optimizer,
             training_args.lr_scheduler_type,
+            optimizer,
             num_warmup_steps=0,
             num_training_steps=total_optimization_steps,
         )
