@@ -106,17 +106,6 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-class ReproducibleTrainer(AdapterTrainer):
-    # create optimizer and scheduler
-    def create_optimizer_and_scheduler(self, num_training_steps: int):
-        self.optimizer = AdamW(self.model.parameters(), lr=self.args.learning_rate, weight_decay=self.args.weight_decay)
-        self.scheduler = get_scheduler(
-            SchedulerType.LINEAR,
-            self.optimizer,
-            num_warmup_steps=0,
-            num_training_steps=num_training_steps)
-
-
 if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
@@ -195,8 +184,18 @@ if __name__ == '__main__':
             training_args.num_train_epochs \
             * (len(train_dataset) // (training_args.per_device_train_batch_size * training_args.n_gpu))
 
-        trainer = ReproducibleTrainer(
-            model_init=lambda: model_init(args.model_name),
+        model = model_init(args.model_name)
+        optimizer = AdamW(model.parameters(), lr=training_args.learning_rate, weight_decay=training_args.weight_decay)
+        scheduler = get_scheduler(
+            optimizer,
+            training_args.lr_scheduler_type,
+            num_warmup_steps=0,
+            num_training_steps=total_optimization_steps,
+        )
+
+        trainer = AdapterTrainer(
+            model=model,
+            optimizers=(optimizer, scheduler),
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=dev_dataset,
