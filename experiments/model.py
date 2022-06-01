@@ -7,16 +7,18 @@ def get_model(model_name: str, model_config: dict):
     # add classification head (regardless of the model)
     model.add_classification_head("emo", num_labels=4)
 
-    if model_config.get("adapter", False):  # adapters
+    if model_config["type"] == "adapter":
         adapter_config = AdapterConfig.load(model_config["adapter_config"])
         model.add_adapter("emo", adapter_config)
         model.train_adapter("emo")
         model.set_active_adapters(["emo"])
-    elif model_config.get("bitfit", False):  # train only biases
+    elif model_config["type"] == "bitfit":
         # freeze all model parameters except the biases and the heads
         for name, param in model.named_parameters():
             if 'bias' not in name and 'head' not in name:
                 param.requires_grad = False
+    else:
+        raise ValueError(f"Unknown model type: {model_config['type']}")
 
     return model
 
