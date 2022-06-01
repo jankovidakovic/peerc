@@ -48,7 +48,7 @@ if __name__ == '__main__':
     for i in range(1, args.n_runs + 1):
 
         wandb.init(
-            entity="jankovidakovic",
+            entity="we-robot",
             project="emotion-classification-using-transformers",
             name=f"{args.run_name}_{i}",
             allow_val_change=True

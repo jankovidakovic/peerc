@@ -27,6 +27,21 @@ We, robot
 ### Running the models
 #### Baselines
     - Instructions coming soon
-    
+#### Command-line arguments
+   - `--config` -- path to the config file (e.g. `config/adapter-test.yaml`)
+   - `--device` -- device to use for training (e.g. `cuda`)
+   - `--model_name` -- name of the transformer model that will be downloaded from HuggingFace (e.g. `roberta-base`)
+   - `--run_name` -- name of the experiment run (e.g. `adapter-test`)
+   - `--run_dir` -- name of the directory in which the experiment data will be saved (e.g. `runs/adapter-test`)
+   - `--n_runs` -- number of experiment runs. If more than one, metric statistics will also be computed.
+#### Weights and biases
+   
+We use weights and biases, and the root of the project is located at https://wandb.ai/we-robot/tar-project
+To be able to log new runs, you must login to w&b. The easiest way to do this is:
+   - before running the experiment, run `python -m wandb login`
+   - go to https://wandb.ai and obtain your API key
+   - paste API key to the command line
+   - thats it, everything should work
+
 #### Main experiments
-    `python -m experiments.main --<cli_args>`
+    `python -m experiments.main <cli_args>

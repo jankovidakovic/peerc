@@ -1,17 +1,16 @@
 name: "adapter-test"
 description: "Test for the adapter fine-tuning configuration."
-# data is redundant, present in every file. move to data.yaml
 data:
-  data_dir: "data"
-  train_file: "train.txt"
-  dev_file: "dev.txt"
-  test_file: "test.txt"
-model:
-  type: adapter
-  adapter_config: pfeiffer
-training_args:
+  data_dir: "data"  # directory containing the training data
+  train_file: "train.txt"  # name of the file containing the training data
+  dev_file: "dev.txt"   # name of the file containing the validation data
+  test_file: "test.txt"  # name of the file containing the testing data
+model:  # model-specific configuration
+  type: adapter  # type of the model to use. Currently supported: ["adapter", "bitfit"]
+  adapter_config: pfeiffer  # adapter config, used only if the model type is "adapter".
+training_args:  # training arguments passed to the trainer
   learning_rate: 0.0001
   per_device_train_batch_size: 16
   per_device_eval_batch_size: 16
   weight_decay: 0.01
-  num_train_epochs: 1
+  num_train_epochs: 1  # set to 1 because this is a testing example
