@@ -1,17 +1,16 @@
 import os
-from typing import Optional, NamedTuple
+from functools import partial
+from typing import Optional, NamedTuple, Callable
 
 import numpy as np
+import pandas as pd
 import torch
-import torch.utils.data
+import torch.utils
 from torch.utils.data import DataLoader
 
-from preprocessing import get_bag_of_tokens, tokenize_data
-from vocab import Vocab
-
-import pandas as pd
-
-Instance = NamedTuple('Instance', [('text', str), ('label', str)])
+from baselines.lstm.vocab import Vocab
+from common_utils import load_data_from_path
+from preprocessing import tokenize_data, get_bag_of_tokens, preprocess
 
 
 class NLPDataset(torch.utils.data.Dataset):
@@ -130,14 +129,28 @@ def get_dataloaders(*,
     return dataloaders
 
 
-def load_data_from_path(path: str) -> pd.DataFrame:
-    """Loads data from a csv file at the given path.
+def get_datasets(_config: dict[str, str]) -> (NLPDataset, NLPDataset, NLPDataset):
+    train_path = os.path.join(_config["data_dir"], _config["train_file"])
+    _train_dataset = dataset_from_file(train_path)
 
-    :param path:  path to the file containing data
-    :return:
-    """
-    df = pd.read_csv(path, sep="\t").drop('id', axis=1)
-    return df
+    dev_path = os.path.join(_config["data_dir"], _config["dev_file"])
+    _dev_dataset = dataset_from_file(dev_path, text_vocab=_train_dataset.text_vocab,
+                                     label_vocab=_train_dataset.label_vocab)
+    test_path = os.path.join(_config["data_dir"], _config["test_file"])
+    _test_dataset = dataset_from_file(test_path, text_vocab=_train_dataset.text_vocab,
+                                      label_vocab=_train_dataset.label_vocab)
+
+    return _train_dataset, _dev_dataset, _test_dataset
+
+
+def raw_data_from_path(dataset_path: str):
+    df = load_data_from_path(dataset_path)
+
+    tokenized_df = tokenize_data(df)
+    text_tokens = tokenized_df.loc[:, "text_tokenized"].tolist()
+    labels = tokenized_df.loc[:, "label"].tolist()
+
+    return text_tokens, labels
 
 
 def dataset_from_file(
@@ -166,44 +179,28 @@ def dataset_from_file(
     return dataset
 
 
-def raw_data_from_path(dataset_path: str):
-    df = load_data_from_path(dataset_path)
-    # dev_df = load_data_from_path(dev_path)
-    # test_df = load_data_from_path(test_path)
-
-    tokenized_df = tokenize_data(df)
-    text_tokens = tokenized_df.loc[:, "text_tokenized"].tolist()
-    labels = tokenized_df.loc[:, "label"].tolist()
-
-    return text_tokens, labels
+Instance = NamedTuple('Instance', [('text', str), ('label', str)])
 
 
-def get_datasets(_config: dict[str, str]) -> (NLPDataset, NLPDataset, NLPDataset):
-    train_path = os.path.join(_config["data_dir"], _config["train_file"])
-    _train_dataset = dataset_from_file(train_path)
-
-    dev_path = os.path.join(_config["data_dir"], _config["dev_file"])
-    _dev_dataset = dataset_from_file(dev_path, text_vocab=_train_dataset.text_vocab,
-                                     label_vocab=_train_dataset.label_vocab)
-    test_path = os.path.join(_config["data_dir"], _config["test_file"])
-    _test_dataset = dataset_from_file(test_path, text_vocab=_train_dataset.text_vocab,
-                                      label_vocab=_train_dataset.label_vocab)
-
-    return _train_dataset, _dev_dataset, _test_dataset
+def load_datasets(special_tokens: str = "start"):
+    preprocessing_fn = partial(preprocess, special_tokens=special_tokens)
+    train_dataset = load_dataset_from_file("data/train.txt", preprocessing_fn)
+    dev_dataset = load_dataset_from_file("data/dev.txt", preprocessing_fn)
+    test_dataset = load_dataset_from_file("data/test.txt", preprocessing_fn)
+    return train_dataset, dev_dataset, test_dataset
 
 
-if __name__ == '__main__':
-    config = {
-        "data_dir": "data",
-        "train_file": "train.txt",
-        "dev_file": "dev.txt",
-        "test_file": "test.txt"
-    }
+def load_dataset_from_file(file_path, preprocess_fn: Callable[[pd.DataFrame], pd.DataFrame] = None):
+    """Loads the dataset from the given path and applies the preprocessing function if provided.
 
-    train_dataset, dev_dataset, test_dataset = get_datasets(config)
+    :param file_path:  path to the dataset file
+    :param preprocess_fn:  function to apply to the dataset
+    :return: the dataset, optionally preprocessed
+    """
 
-    print(f"Train dataset: {len(train_dataset)}")
-    print(f"Dev dataset: {len(dev_dataset)}")
-    print(f"Test dataset: {len(test_dataset)}")
+    # Load the dataset
+    df = pd.read_csv(file_path, sep='\t').drop('id', axis=1)
 
-    # TODO - check how many unknown tokens appear in the dev and test sets
+    # Preprocess the dataset
+    df = preprocess_fn(df) if preprocess_fn else df
+    return df

@@ -1,6 +1,8 @@
 import json
 import math
 from typing import Optional, Iterable, Union
+
+import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
 default_ignore_classes: Iterable[int] = frozenset({0})
@@ -303,3 +305,16 @@ class MetricLogger:
                 "hyperparameters": self._hyperparameters,
                 "metrics": self._metrics
             }, f, indent=4)
+
+
+def emo_metrics(eval_pred):
+    y_pred, y_true = eval_pred
+
+    # convert y_pred to logits
+    y_pred = np.argmax(y_pred, axis=-1)
+
+    metric_calc = ClassificationMetrics()
+    metric_calc.add_data(y_true, y_pred)
+    all_metrics = metric_calc.all_metrics()
+
+    return all_metrics

@@ -2,7 +2,7 @@ name: "adapter-bottleneck"
 description: "Adapter fine-tuning using the Pfeiffer bottleneck configuration."
 paper: "https://arxiv.org/abs/2005.00247"
 data:
-  data_dir: "data"
+  data_dir: "../data"
   train_file: "train.txt"
   dev_file: "dev.txt"
   test_file: "test.txt"
@@ -12,3 +12,5 @@ model:
   per_device_eval_batch_size: 16
   weight_decay: 0
   num_train_epochs: 30
+  adapter: True
+  adapter_config: "pfeiffer"

@@ -8,6 +8,8 @@ prototyping.ipynb
 model.pt
 runs/**
 wandb/**
+experiments/runs/**
+experiments/wandb/**
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all

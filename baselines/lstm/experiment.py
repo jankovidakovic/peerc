@@ -4,10 +4,10 @@ import torch
 import torch.nn.functional as F
 
 from data import get_dataloaders, get_datasets
-from embeddings import EmbeddingLoader
+from baselines.lstm.embeddings import EmbeddingLoader
 from metrics import MetricLogger, MetricFactory, MetricStats
-from model import LSTMBaseline
-from trainer import train, evaluate
+from baselines.lstm.model import LSTMBaseline
+from baselines.lstm.trainer import train, evaluate
 
 
 def run(run_id: int, config: dict, args, save_model: bool = False):

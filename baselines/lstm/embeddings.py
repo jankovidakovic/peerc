@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 import tqdm
 
-from vocab import Vocab
+from baselines.lstm.vocab import Vocab
 
 
 class EmbeddingLoader:

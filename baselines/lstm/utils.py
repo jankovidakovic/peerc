@@ -51,5 +51,5 @@ if __name__ == '__main__':
     embedding_loader = EmbeddingLoader.from_config(_config)
     embedding_loader.vocab = train_dataset.text_vocab
     embeddings = embedding_loader.load_embeddings(args.device)
-    save_embedding_matrix(embeddings, "data/embeddings.pt")
+    save_embedding_matrix(embeddings, "../../data/embeddings.pt")
     print(f"Successfully saved embeddings to a pt file.")

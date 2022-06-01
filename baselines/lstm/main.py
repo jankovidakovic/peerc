@@ -2,8 +2,8 @@ import os.path
 
 import yaml
 
-from experiment import multiple_runs, run
-from utils import get_parser
+from baselines.lstm.experiment import multiple_runs, run
+from baselines.lstm.utils import get_parser
 
 
 def main():
