@@ -1,5 +1,5 @@
-WANDB_LOG_MODEL=true python run.py \
-	--config experiments/adapter-test.yaml \
+WANDB_LOG_MODEL=true python -m experiments.main \
+	--config config/adapter-test.yaml \
 	--device cuda \
 	--model_name "roberta-base" \
 	--run_name "roberta-test" \
