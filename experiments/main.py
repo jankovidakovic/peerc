@@ -79,7 +79,7 @@ if __name__ == '__main__':
             save_total_limit=1,  # save only the best model
             optim=OptimizerNames.ADAMW_TORCH,
             lr_scheduler_type=SchedulerType.LINEAR,
-            **config["model"],
+            **config["training_args"],
             seed=seed,
         )
 
