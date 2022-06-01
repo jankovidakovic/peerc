@@ -12,7 +12,7 @@ from transformers.training_args import OptimizerNames
 
 from experiments.data import get_datasets
 from experiments.utils import get_parser, get_total_optimization_steps
-from model import get_model, get_optimizer_and_scheduler
+from experiments.model import get_model, get_optimizer_and_scheduler
 from metrics import MetricStats, emo_metrics
 from common_utils import set_seed
 

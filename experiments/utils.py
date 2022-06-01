@@ -3,7 +3,7 @@ import argparse
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="../config/adapter-bottleneck.yaml")
+    parser.add_argument("--config", type=str, default="config/adapter-bottleneck.yaml")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--model_name", type=str, default="roberta-base")
     parser.add_argument("--run_name", type=str, default="pfeiffer_final")
