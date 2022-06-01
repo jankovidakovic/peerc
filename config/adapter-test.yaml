@@ -12,3 +12,5 @@ model:
   per_device_eval_batch_size: 16
   weight_decay: 0.01
   num_train_epochs: 1
+  adapter: True
+  adapter_config: pfeiffer

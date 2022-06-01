@@ -13,4 +13,4 @@ model:
   weight_decay: 0
   num_train_epochs: 30
   adapter: True
-  adapter_config: "pfeiffer"
+  adapter_config: pfeiffer
