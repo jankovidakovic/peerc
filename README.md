@@ -23,3 +23,10 @@ We, robot
     - *specify the package version*, it insures that our code works forever and is not broken by package updates
 3. run `conda env update --prune` to update the environment and sync with the new state of `environment.yml`
  - conda cheat sheet: https://docs.conda.io/projects/conda/en/4.6.0/_downloads/52a95608c49671267e40c689e0bc00ca/conda-cheatsheet.pdf
+
+### Running the models
+#### Baselines
+    - Instructions coming soon
+    
+#### Main experiments
+    `python -m experiments.main --<cli_args>`
