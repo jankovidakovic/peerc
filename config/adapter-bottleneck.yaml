@@ -15,5 +15,3 @@ training_args:  # training arguments passed to the trainer
   per_device_eval_batch_size: 16
   weight_decay: 0
   num_train_epochs: 30
-  adapter: True
-  adapter_config: pfeiffer
