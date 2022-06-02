@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     for i in range(1, args.n_runs + 1):
 
-        wandb.init(
+        wandb_run = wandb.init(
             entity="we-robot",
             project="emotion-classification-using-transformers",
             name=f"{args.run_name}_{i}",
@@ -60,7 +60,7 @@ if __name__ == '__main__':
         seed = np.random.randint(0, 2 ** 32)
         set_seed(seed)
 
-        wandb.config.update({"seed": seed})
+        wandb_run.config.update({"seed": seed})
 
         # create run dir if it doesnt exist
         if not os.path.exists(args.run_dir):
@@ -73,10 +73,10 @@ if __name__ == '__main__':
 
         training_args = TrainingArguments(
             output_dir=run_dir,
-            # evaluation_strategy=IntervalStrategy.EPOCH,
-            # save_strategy=IntervalStrategy.EPOCH,
-            evaluation_strategy=IntervalStrategy.STEPS,
-            save_strategy=IntervalStrategy.STEPS,
+            evaluation_strategy=IntervalStrategy.EPOCH,
+            save_strategy=IntervalStrategy.EPOCH,
+            # evaluation_strategy=IntervalStrategy.STEPS,
+            # save_strategy=IntervalStrategy.STEPS,
             report_to=["wandb"],
             metric_for_best_model="f1_score",
             load_best_model_at_end=True,
@@ -84,7 +84,6 @@ if __name__ == '__main__':
             optim=OptimizerNames.ADAMW_TORCH,
             lr_scheduler_type=SchedulerType.LINEAR,
             **config["training_args"],
-            max_steps=10,
             seed=seed,
         )
 
@@ -117,7 +116,7 @@ if __name__ == '__main__':
             compute_metrics=emo_metrics,
             callbacks=[
                 EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.001),
-            ]
+            ],
         )
         # trainer.create_optimizer_and_scheduler(total_optimization_steps)
 
@@ -148,7 +147,7 @@ if __name__ == '__main__':
         # will this work tho?
 
         metric_stats.update(metrics)
-        wandb.log(metrics)
+        wandb_run.log(metrics)
 
         # save metrics to a file
         with open(os.path.join(run_dir, "metrics.json"), "w") as f:
@@ -158,7 +157,23 @@ if __name__ == '__main__':
         with open(os.path.join(run_dir, "predictions.json"), "w") as f:
             json.dump({"y_pred": y_pred.tolist(), "y_true": y_true.tolist()}, f)
 
-        wandb.finish()
+        # save model to an artifact, together with the adapter and the head
+        # model_artifact = wandb.Artifact("model", type="model", description="Trained model")
+        # artifact_dir = os.path.join(run_dir, "model_artifact")
+        # if not os.path.exists(artifact_dir):
+        #     os.makedirs(artifact_dir)
+        # model_artifact.add_dir(artifact_dir)
+
+        # save the model
+        # model.save_pretrained(artifact_dir)
+
+        # save the adapter and the head
+        # model.save_adapter(artifact_dir, "emo", with_head=True)
+
+        # save the config
+        # wandb_run.log_artifact(artifact_dir)
+
+        wandb_run.finish()
 
     wandb.join()
 
