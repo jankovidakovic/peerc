@@ -6,7 +6,10 @@ data:
   train_file: "train.txt"
   dev_file: "dev.txt"
   test_file: "test.txt"
-model:
+model:  # model-specific configuration
+  type: adapter  # type of the model to use. Currently supported: ["adapter", "bitfit"]
+  adapter_config: pfeiffer  # adapter config, used only if the model type is "adapter".
+training_args:  # training arguments passed to the trainer
   learning_rate: 0.0001
   per_device_train_batch_size: 16
   per_device_eval_batch_size: 16
