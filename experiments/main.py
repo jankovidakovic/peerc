@@ -13,7 +13,7 @@ from transformers.training_args import OptimizerNames
 from experiments.data import get_datasets
 from experiments.utils import get_parser, get_total_optimization_steps
 from experiments.model import get_model, get_optimizer_and_scheduler
-from metrics import MetricStats, emo_metrics
+from metrics import MetricStats, emo_metrics, emo_metrics_verbose, ClassificationMetrics
 from common_utils import set_seed
 
 if __name__ == '__main__':
@@ -53,6 +53,8 @@ if __name__ == '__main__':
             name=f"{args.run_name}_{i}",
             allow_val_change=True
         )
+        # prediction_columns = ["turn1", "turn2", "turn3", "y_pred", "y_true"]
+        # table = wandb.Table(columns=prediction_columns)
 
         # generate a random seed
         seed = np.random.randint(0, 2 ** 32)
@@ -71,8 +73,10 @@ if __name__ == '__main__':
 
         training_args = TrainingArguments(
             output_dir=run_dir,
-            evaluation_strategy=IntervalStrategy.EPOCH,
-            save_strategy=IntervalStrategy.EPOCH,
+            # evaluation_strategy=IntervalStrategy.EPOCH,
+            # save_strategy=IntervalStrategy.EPOCH,
+            evaluation_strategy=IntervalStrategy.STEPS,
+            save_strategy=IntervalStrategy.STEPS,
             report_to=["wandb"],
             metric_for_best_model="f1_score",
             load_best_model_at_end=True,
@@ -80,6 +84,7 @@ if __name__ == '__main__':
             optim=OptimizerNames.ADAMW_TORCH,
             lr_scheduler_type=SchedulerType.LINEAR,
             **config["training_args"],
+            max_steps=10,
             seed=seed,
         )
 
@@ -127,23 +132,31 @@ if __name__ == '__main__':
         # so we need to move it to the correct device
         trainer.model.to(device)
 
-        metrics = trainer.evaluate(test_dataset)
+        # trainer.compute_metrics = emo_metrics_verbose  # okay i guess we cannot do that
 
-        eval_metrics = {
-            "f1_score": metrics["eval_f1_score"],
-            "accuracy": metrics["eval_accuracy"],
-            "loss": metrics["eval_loss"],
-            "precision": metrics["eval_precision"],
-            "recall": metrics["eval_recall"],
-        }
+        # metrics = trainer.evaluate(test_dataset)
+        y_pred, y_true, metrics = trainer.predict(test_dataset)
 
-        metric_stats.update(eval_metrics)
+        # y_pred, y_true = eval_pred
 
-        wandb.log(eval_metrics)
+        # convert y_pred to logits
+        y_pred = np.argmax(y_pred, axis=-1)
+
+        # metric_calc = ClassificationMetrics()
+        # metric_calc.add_data(y_true, y_pred)
+
+        # will this work tho?
+
+        metric_stats.update(metrics)
+        wandb.log(metrics)
 
         # save metrics to a file
         with open(os.path.join(run_dir, "metrics.json"), "w") as f:
             json.dump(metrics, f)
+
+        # save y_pred to a file
+        with open(os.path.join(run_dir, "predictions.json"), "w") as f:
+            json.dump({"y_pred": y_pred.tolist(), "y_true": y_true.tolist()}, f)
 
         wandb.finish()
 

@@ -5,7 +5,7 @@ from torch.optim import AdamW
 from transformers import AutoAdapterModel, get_scheduler, AdapterConfig
 
 
-def get_model(model_name_or_path: str, model_config: dict, train: bool = True, load_state_dict: bool = True):
+def get_model(model_name_or_path: str, model_config: dict, train: bool = True, load_state_dict: bool = False):
     model = AutoAdapterModel.from_pretrained(model_name_or_path)
     # add classification head (regardless of the model)
     if not load_state_dict:
