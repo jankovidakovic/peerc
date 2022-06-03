@@ -19,11 +19,11 @@ def get_model(model_name_or_path: str, model_config: dict, train: bool = True, l
         model.set_active_adapters(["emo"])
         if train:
             model.train_adapter("emo")
-    elif model_config["type"] == "bitfit" and not train:
-        # freeze all model parameters except the biases and the heads
-        for name, param in model.named_parameters():
-            if 'bias' not in name and 'head' not in name:
-                param.requires_grad = False
+    elif model_config["type"] == "bitfit":
+        if not train:
+            for name, param in model.named_parameters():
+                if 'bias' not in name and 'head' not in name:
+                    param.requires_grad = False
     elif model_config["type"] != "raw":
         # if raw, we dont need to do anything
         raise ValueError(f"Unknown model type: {model_config['type']}")
