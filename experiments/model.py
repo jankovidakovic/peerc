@@ -24,7 +24,8 @@ def get_model(model_name_or_path: str, model_config: dict, train: bool = True, l
         for name, param in model.named_parameters():
             if 'bias' not in name and 'head' not in name:
                 param.requires_grad = False
-    else:
+    elif model_config["type"] != "raw":
+        # if raw, we dont need to do anything
         raise ValueError(f"Unknown model type: {model_config['type']}")
 
     if load_state_dict:

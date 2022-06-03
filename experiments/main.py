@@ -75,8 +75,6 @@ if __name__ == '__main__':
             output_dir=run_dir,
             evaluation_strategy=IntervalStrategy.EPOCH,
             save_strategy=IntervalStrategy.EPOCH,
-            # evaluation_strategy=IntervalStrategy.STEPS,
-            # save_strategy=IntervalStrategy.STEPS,
             report_to=["wandb"],
             metric_for_best_model="f1_score",
             load_best_model_at_end=True,
@@ -96,12 +94,17 @@ if __name__ == '__main__':
 
         model = get_model(args.model_name, config["model"])
 
+        if config["training_args"].get("warmup_percentage", 0) > 0:
+            num_warmup_steps = int(total_optimization_steps * config["model"]["warmup_percentage"])
+        else:
+            num_warmup_steps = 0
+
         optimizer, scheduler = get_optimizer_and_scheduler(
             model,
             training_args.learning_rate,
             training_args.weight_decay,
             training_args.lr_scheduler_type,
-            num_warmup_steps=0,
+            num_warmup_steps=num_warmup_steps,
             num_training_steps=total_optimization_steps,
         )
 
