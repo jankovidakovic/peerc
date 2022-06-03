@@ -7,7 +7,7 @@ import yaml
 
 import wandb
 from transformers import TrainingArguments, IntervalStrategy, \
-    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback, SchedulerType
+    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback, SchedulerType, Trainer
 from transformers.training_args import OptimizerNames
 
 from experiments.data import get_datasets
@@ -75,15 +75,13 @@ if __name__ == '__main__':
             output_dir=run_dir,
             evaluation_strategy=IntervalStrategy.EPOCH,
             save_strategy=IntervalStrategy.EPOCH,
-            # evaluation_strategy=IntervalStrategy.STEPS,
-            # save_strategy=IntervalStrategy.STEPS,
             report_to=["wandb"],
             metric_for_best_model="f1_score",
             load_best_model_at_end=True,
             save_total_limit=1,  # save only the best model
             optim=OptimizerNames.ADAMW_TORCH,
             lr_scheduler_type=SchedulerType.LINEAR,
-            **config["training_args"],
+            **{key: value for key, value in config["training_args"].items() if key != "warmup_percentage"},
             seed=seed,
         )
 
@@ -96,16 +94,23 @@ if __name__ == '__main__':
 
         model = get_model(args.model_name, config["model"])
 
+        if config["training_args"].get("warmup_percentage", 0) > 0:
+            num_warmup_steps = int(total_optimization_steps * config["training_args"]["warmup_percentage"])
+        else:
+            num_warmup_steps = 0
+
         optimizer, scheduler = get_optimizer_and_scheduler(
             model,
             training_args.learning_rate,
             training_args.weight_decay,
             training_args.lr_scheduler_type,
-            num_warmup_steps=0,
+            num_warmup_steps=num_warmup_steps,
             num_training_steps=total_optimization_steps,
         )
 
-        trainer = AdapterTrainer(
+        trainer_init = AdapterTrainer if config["model"]["type"] == "adapter" else Trainer
+
+        trainer = trainer_init(
             model=model,
             optimizers=(optimizer, scheduler),
             args=training_args,
