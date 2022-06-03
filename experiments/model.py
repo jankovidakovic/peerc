@@ -20,7 +20,7 @@ def get_model(model_name_or_path: str, model_config: dict, train: bool = True, l
         if train:
             model.train_adapter("emo")
     elif model_config["type"] == "bitfit":
-        if not train:
+        if train:
             for name, param in model.named_parameters():
                 if 'bias' not in name and 'head' not in name:
                     param.requires_grad = False
