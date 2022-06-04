@@ -2,10 +2,12 @@ import json
 
 import torch
 import torch.nn.functional as F
+import wandb
 
-from data import get_dataloaders, get_datasets
+from common_utils import set_seed
+from baselines.lstm.data import get_dataloaders, get_datasets
 from baselines.lstm.embeddings import EmbeddingLoader
-from metrics import MetricLogger, MetricFactory, MetricStats
+from metrics import MetricLogger, MetricFactory, MetricStats, with_prefix
 from baselines.lstm.model import LSTMBaseline
 from baselines.lstm.trainer import train, evaluate
 
@@ -14,9 +16,17 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
 
     hyperparams = config["model"]
 
+    wandb_run = wandb.init(
+        entity="we-robot",
+        # project="emotion-classification-using-transformers",
+        project="test",
+        name=f"{args.run_name}_{run_id}",
+        allow_val_change=True
+    )
+
     if args.seed:
-        torch.manual_seed(args.seed)
-        torch.cuda.manual_seed(args.seed)
+        set_seed(args.seed)
+        wandb_run.config.update({"seed": args.seed})
 
     # load data
     train_dataset, valid_dataset, test_dataset = get_datasets(config["data"])
@@ -32,6 +42,8 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
         device=args.device,
         **hyperparams
     )
+
+    wandb_run.watch(model, log_freq=100)
 
     criterion = F.cross_entropy
 
@@ -70,6 +82,9 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
         metric_logger.log(train_metrics, epoch, "train", args.verbose)
         metric_logger.log(val_metrics, epoch, "valid", args.verbose)
 
+        wandb_run.log(with_prefix(train_metrics, "train"), step=epoch)
+        wandb_run.log(with_prefix(val_metrics, "eval"), step=epoch)
+
     test_dataloader, = get_dataloaders(
         test_dataset=test_dataset,
         eval_batch_size=hyperparams["eval_batch_size"]
@@ -78,6 +93,7 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
     test_loss, test_metrics = evaluate(model, test_dataloader, criterion)
     test_metrics = MetricFactory.from_loss_and_cls_metrics(test_loss, test_metrics)
     metric_logger.log(test_metrics, split="test", verbose=args.verbose)
+    wandb_run.log(with_prefix(test_metrics, "test"), step=1)
 
     if args.save_metrics:
         save_path = f"{args.run_dir}/metrics_{run_id}.json"
@@ -87,10 +103,11 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
         save_path = f"{args.run_dir}/model_{run_id}.pt"
         torch.save(model.state_dict(), save_path)
 
+    wandb_run.finish()
     return test_metrics
 
 
-def multiple_runs(config, args):
+def multiple_runs(config, args, save_model: bool = False):
 
     seeds = torch.randint(100000, (args.n_runs,), dtype=torch.int64)
 
@@ -98,8 +115,7 @@ def multiple_runs(config, args):
     for i, seed in enumerate(seeds, 1):
         print(f"Run {i}/{args.n_runs}; seed {seed}")
         args.seed = seed.item()
-        save_model = True if i == args.n_runs else False  # save model only for last run
-        test_metrics = run(i, config, args, save_model)
+        test_metrics = run(i, config, args, save_model if i == args.n_runs else False)  # hmm
         print("Test metrics: ", end="")
         print(f"{json.dumps(test_metrics, indent=2)}")
         metric_stats.update(test_metrics)
