@@ -1,5 +1,6 @@
 import os.path
 
+import wandb
 import yaml
 
 from baselines.lstm.experiment import multiple_runs, run
@@ -19,10 +20,12 @@ def main():
     with open(f"{args.run_dir}/cli_config.yaml", "w") as f:
         yaml.dump(vars(args), f)
 
+    wandb.login()
+
     if args.n_runs > 1:
         multiple_runs(config, args)
     else:
-        run(1, config, args, True)
+        run(1, config, args, save_model=False)
 
 
 if __name__ == "__main__":

@@ -3,8 +3,8 @@ import argparse
 import torch
 import yaml
 
-from data import get_datasets
-from embeddings import EmbeddingLoader
+from baselines.lstm.data import get_datasets
+from baselines.lstm.embeddings import EmbeddingLoader
 
 
 def save_embedding_matrix(embedding_matrix, filename):

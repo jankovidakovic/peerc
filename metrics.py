@@ -332,3 +332,13 @@ def emo_metrics_verbose(eval_pred):
     # all_metrics = metric_calc.all_metrics()
 
     return metric_calc
+
+
+def with_prefix(metrics: dict, prefix: str):
+    """ Updates the prefix of the metrics.
+
+    :param metrics: metrics dictionary.
+    :param prefix: prefix to add to the metrics.
+    :return: updated metrics dictionary.
+    """
+    return {f"{prefix}_{k}": v for k, v in metrics.items()}
