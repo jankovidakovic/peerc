@@ -1,8 +1,8 @@
 WANDB_LOG_MODEL=true python -m experiments.main \
-	--config config/adapter-test.yaml \
+	--config config/adapter-bottleneck.yaml \
 	--device cuda \
 	--model_name "roberta-base" \
-	--run_name "roberta-test" \
-	--run_dir "runs/test/roberta" \
-	--n_runs 2
+	--run_name "adapter-bottleneck-final" \
+	--run_dir "runs/adapters/bottleneck-final" \
+	--n_runs 10
 

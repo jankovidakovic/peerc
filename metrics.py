@@ -193,8 +193,9 @@ class MetricStats:
         return {
             name: {
                 "mean": self.sum[name] / self.n,
-                "std": self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2,
-                "std_err": math.sqrt(self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2) / math.sqrt(self.n)
+                "var": self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2,
+                "stddev": np.sqrt(self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2),
+                "stderr": np.sqrt(self.sumsq[name] / self.n - (self.sum[name] / self.n) ** 2) / np.sqrt(self.n)
             } for name in self.sum
         }
 
@@ -318,3 +319,16 @@ def emo_metrics(eval_pred):
     all_metrics = metric_calc.all_metrics()
 
     return all_metrics
+
+
+def emo_metrics_verbose(eval_pred):
+    y_pred, y_true = eval_pred
+
+    # convert y_pred to logits
+    y_pred = np.argmax(y_pred, axis=-1)
+
+    metric_calc = ClassificationMetrics()
+    metric_calc.add_data(y_true, y_pred)
+    # all_metrics = metric_calc.all_metrics()
+
+    return metric_calc

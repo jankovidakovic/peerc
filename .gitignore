@@ -10,6 +10,7 @@ runs/**
 wandb/**
 experiments/runs/**
 experiments/wandb/**
+artifacts/**
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm+all

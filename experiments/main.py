@@ -7,13 +7,13 @@ import yaml
 
 import wandb
 from transformers import TrainingArguments, IntervalStrategy, \
-    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback, SchedulerType
+    DataCollatorWithPadding, AdapterTrainer, AutoTokenizer, EarlyStoppingCallback, SchedulerType, Trainer
 from transformers.training_args import OptimizerNames
 
 from experiments.data import get_datasets
 from experiments.utils import get_parser, get_total_optimization_steps
 from experiments.model import get_model, get_optimizer_and_scheduler
-from metrics import MetricStats, emo_metrics
+from metrics import MetricStats, emo_metrics, emo_metrics_verbose, ClassificationMetrics
 from common_utils import set_seed
 
 if __name__ == '__main__':
@@ -47,18 +47,20 @@ if __name__ == '__main__':
 
     for i in range(1, args.n_runs + 1):
 
-        wandb.init(
+        wandb_run = wandb.init(
             entity="we-robot",
             project="emotion-classification-using-transformers",
             name=f"{args.run_name}_{i}",
             allow_val_change=True
         )
+        # prediction_columns = ["turn1", "turn2", "turn3", "y_pred", "y_true"]
+        # table = wandb.Table(columns=prediction_columns)
 
         # generate a random seed
         seed = np.random.randint(0, 2 ** 32)
         set_seed(seed)
 
-        wandb.config.update({"seed": seed})
+        wandb_run.config.update({"seed": seed})
 
         # create run dir if it doesnt exist
         if not os.path.exists(args.run_dir):
@@ -79,7 +81,7 @@ if __name__ == '__main__':
             save_total_limit=1,  # save only the best model
             optim=OptimizerNames.ADAMW_TORCH,
             lr_scheduler_type=SchedulerType.LINEAR,
-            **config["training_args"],
+            **{key: value for key, value in config["training_args"].items() if key != "warmup_percentage"},
             seed=seed,
         )
 
@@ -92,16 +94,23 @@ if __name__ == '__main__':
 
         model = get_model(args.model_name, config["model"])
 
+        if config["training_args"].get("warmup_percentage", 0) > 0:
+            num_warmup_steps = int(total_optimization_steps * config["training_args"]["warmup_percentage"])
+        else:
+            num_warmup_steps = 0
+
         optimizer, scheduler = get_optimizer_and_scheduler(
             model,
             training_args.learning_rate,
             training_args.weight_decay,
             training_args.lr_scheduler_type,
-            num_warmup_steps=0,
+            num_warmup_steps=num_warmup_steps,
             num_training_steps=total_optimization_steps,
         )
 
-        trainer = AdapterTrainer(
+        trainer_init = AdapterTrainer if config["model"]["type"] == "adapter" else Trainer
+
+        trainer = trainer_init(
             model=model,
             optimizers=(optimizer, scheduler),
             args=training_args,
@@ -112,7 +121,7 @@ if __name__ == '__main__':
             compute_metrics=emo_metrics,
             callbacks=[
                 EarlyStoppingCallback(early_stopping_patience=5, early_stopping_threshold=0.001),
-            ]
+            ],
         )
         # trainer.create_optimizer_and_scheduler(total_optimization_steps)
 
@@ -127,25 +136,49 @@ if __name__ == '__main__':
         # so we need to move it to the correct device
         trainer.model.to(device)
 
-        metrics = trainer.evaluate(test_dataset)
+        # trainer.compute_metrics = emo_metrics_verbose  # okay i guess we cannot do that
 
-        eval_metrics = {
-            "f1_score": metrics["eval_f1_score"],
-            "accuracy": metrics["eval_accuracy"],
-            "loss": metrics["eval_loss"],
-            "precision": metrics["eval_precision"],
-            "recall": metrics["eval_recall"],
-        }
+        # metrics = trainer.evaluate(test_dataset)
+        y_pred, y_true, metrics = trainer.predict(test_dataset)
 
-        metric_stats.update(eval_metrics)
+        # y_pred, y_true = eval_pred
 
-        wandb.log(eval_metrics)
+        # convert y_pred to logits
+        y_pred = np.argmax(y_pred, axis=-1)
+
+        # metric_calc = ClassificationMetrics()
+        # metric_calc.add_data(y_true, y_pred)
+
+        # will this work tho?
+
+        metric_stats.update(metrics)
+        wandb_run.log(metrics)
 
         # save metrics to a file
         with open(os.path.join(run_dir, "metrics.json"), "w") as f:
             json.dump(metrics, f)
 
-        wandb.finish()
+        # save y_pred to a file
+        with open(os.path.join(run_dir, "predictions.json"), "w") as f:
+            json.dump({"y_pred": y_pred.tolist(), "y_true": y_true.tolist()}, f)
+
+        # save model to an artifact, together with the adapter and the head
+        # model_artifact = wandb.Artifact("model", type="model", description="Trained model")
+        # artifact_dir = os.path.join(run_dir, "model_artifact")
+        # if not os.path.exists(artifact_dir):
+        #     os.makedirs(artifact_dir)
+        # model_artifact.add_dir(artifact_dir)
+
+        # save the model
+        # model.save_pretrained(artifact_dir)
+
+        # save the adapter and the head
+        # model.save_adapter(artifact_dir, "emo", with_head=True)
+
+        # save the config
+        # wandb_run.log_artifact(artifact_dir)
+
+        wandb_run.finish()
 
     wandb.join()
 
