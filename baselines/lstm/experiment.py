@@ -113,7 +113,7 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
     test_loss, test_metrics = evaluate(model, test_dataloader, criterion)
     test_metrics = MetricFactory.from_loss_and_cls_metrics(test_loss, test_metrics)
     metric_logger.log(test_metrics, split="test", verbose=args.verbose)
-    wandb_run.log(with_prefix(test_metrics, "test"), step=1)
+    wandb_run.log(with_prefix(test_metrics, "test"))
 
     if args.save_metrics:
         save_path = f"{args.run_dir}/metrics_{run_id}.json"
