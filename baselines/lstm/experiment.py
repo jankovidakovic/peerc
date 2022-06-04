@@ -54,7 +54,7 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
 
     early_stopping_triggers = 0
     early_stopping_patience = 5
-    best_f1 = float("inf")
+    best_f1 = 0
 
     for epoch in range(1, hyperparams["n_epochs"] + 1):
         # reload dataloaders
@@ -86,6 +86,7 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
             early_stopping_triggers = 0
             best_f1 = eval_metrics.f1_score()
             # save model
+            print(f"Saving model of epoch {epoch} to {args.run_dir}/model.pt")
             torch.save(model.state_dict(), f"{args.run_dir}/model.pt")
 
         train_metrics = MetricFactory.from_loss_and_cls_metrics(train_loss, train_metrics)
