@@ -7,10 +7,10 @@ data:
   test_file: "test.txt"
   embedding_file: "embeddings.pt"
 model:
-  batch_size: 64
+  batch_size: 32
   eval_batch_size: 128
   n_epochs: 20
-  learning_rate: 0.0005
+  learning_rate: 0.0001
   max_grad_norm: 0.75
   embeddings: "pt"
   embedding_dim: 300

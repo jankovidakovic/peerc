@@ -52,6 +52,10 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
 
     metric_logger = MetricLogger(args.seed, hyperparams, args.verbose)
 
+    early_stopping_triggers = 0
+    early_stopping_patience = 5
+    best_f1 = float("inf")
+
     for epoch in range(1, hyperparams["n_epochs"] + 1):
         # reload dataloaders
         train_dataloader, valid_dataloader = get_dataloaders(
@@ -76,6 +80,14 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
             device=args.device
         )
 
+        if eval_metrics.f1_score() < best_f1:
+            early_stopping_triggers += 1
+        else:
+            early_stopping_triggers = 0
+            best_f1 = eval_metrics.f1_score()
+            # save model
+            torch.save(model.state_dict(), f"{args.run_dir}/model.pt")
+
         train_metrics = MetricFactory.from_loss_and_cls_metrics(train_loss, train_metrics)
         val_metrics = MetricFactory.from_loss_and_cls_metrics(eval_loss, eval_metrics)
 
@@ -84,6 +96,13 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
 
         wandb_run.log(with_prefix(train_metrics, "train"), step=epoch)
         wandb_run.log(with_prefix(val_metrics, "eval"), step=epoch)
+
+        if early_stopping_triggers >= early_stopping_patience:
+            print(f"Early stopping triggered after {early_stopping_triggers} epochs")
+            break
+
+    # load best model
+    model.load_state_dict(torch.load(f"{args.run_dir}/model.pt"))
 
     test_dataloader, = get_dataloaders(
         test_dataset=test_dataset,
