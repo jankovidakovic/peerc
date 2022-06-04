@@ -18,8 +18,7 @@ def run(run_id: int, config: dict, args, save_model: bool = False):
 
     wandb_run = wandb.init(
         entity="we-robot",
-        # project="emotion-classification-using-transformers",
-        project="test",
+        project="emotion-classification-using-transformers",
         name=f"{args.run_name}_{run_id}",
         allow_val_change=True
     )
