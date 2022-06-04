@@ -9,9 +9,9 @@ data:
 model:
   batch_size: 64
   eval_batch_size: 128
-  n_epochs: 1
+  n_epochs: 20
   learning_rate: 0.0005
-  max_grad_norm: 0.888
+  max_grad_norm: 0.75
   embeddings: "pt"
   embedding_dim: 300
   freeze_embeddings: False
