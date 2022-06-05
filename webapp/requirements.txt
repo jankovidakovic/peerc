@@ -1,0 +1,9 @@
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==1.11.0+cpu
+wandb==0.12.17
+pandas==1.4.2
+flask==2.0.2
+adapter-transformers==3.0.1
+
+spacy>=3.0.0,<4.0.0
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm
